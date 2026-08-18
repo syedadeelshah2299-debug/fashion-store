@@ -393,7 +393,19 @@
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root">
+  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#15130F; color:#F3EDE3; font-family:sans-serif; padding:20px; text-align:center;">
+    <div>
+      <p style="margin-bottom:10px;">Loading store…</p>
+      <p style="font-size:12px; opacity:0.6;">If this message doesn't go away, there may be a script loading issue. Try refreshing, or check your connection.</p>
+    </div>
+  </div>
+</div>
+<script>
+  window.addEventListener('error', function(e){
+    console.error('Global error:', e.message, e.filename, e.lineno);
+  });
+</script>
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
@@ -460,7 +472,18 @@ const SEED_PRODUCTS = [
 /* ---------------- Supabase setup ---------------- */
 const SUPABASE_URL = 'https://qkysezjkclpclkmrnops.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DK4vPx2YLcWKRqts_McmFQ_A2JHTyQ-';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let supabaseClient = null;
+let supabaseInitError = null;
+try{
+  if(!window.supabase || !window.supabase.createClient){
+    throw new Error('Supabase SDK did not load from CDN. Check your internet connection or ad-blocker and refresh.');
+  }
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}catch(e){
+  supabaseInitError = e.message;
+  console.error('Supabase init failed:', e);
+}
 
 /* Map a Supabase row (image_url: string) to the app's product shape (images: array) */
 function rowToProduct(row){
@@ -491,31 +514,34 @@ function productToRow(p){
 
 /* ---------------- Storage helpers (Supabase-backed) ---------------- */
 async function loadProducts(){
+  if(!supabaseClient) return { error: supabaseInitError || 'Supabase client not initialized', data: [] };
   try{
-    const { data, error } = await supabase.from('products').select('*').order('id', { ascending:false });
-    if(error){ console.error('Supabase load error:', error); return []; }
-    if(data && data.length){ return data.map(rowToProduct); }
-    return [];
+    const { data, error } = await supabaseClient.from('products').select('*').order('id', { ascending:false });
+    if(error){ console.error('Supabase load error:', error); return { error: error.message, data: [] }; }
+    return { error: null, data: (data || []).map(rowToProduct) };
   }catch(e){
     console.error('Supabase load exception:', e);
-    return [];
+    return { error: e.message, data: [] };
   }
 }
 
 async function insertProduct(p){
-  const { data, error } = await supabase.from('products').insert([productToRow(p)]).select();
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { data, error } = await supabaseClient.from('products').insert([productToRow(p)]).select();
   if(error){ console.error('Supabase insert error:', error); throw error; }
   return data && data[0] ? rowToProduct(data[0]) : null;
 }
 
 async function updateProductRow(id, p){
-  const { data, error } = await supabase.from('products').update(productToRow(p)).eq('id', id).select();
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { data, error } = await supabaseClient.from('products').update(productToRow(p)).eq('id', id).select();
   if(error){ console.error('Supabase update error:', error); throw error; }
   return data && data[0] ? rowToProduct(data[0]) : null;
 }
 
 async function deleteProductRow(id){
-  const { error } = await supabase.from('products').delete().eq('id', id);
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { error } = await supabaseClient.from('products').delete().eq('id', id);
   if(error){ console.error('Supabase delete error:', error); throw error; }
 }
 
@@ -1166,12 +1192,14 @@ function App(){
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [fireToast, toastNode] = useToast();
 
   useEffect(()=>{
     (async ()=>{
-      const [p, c] = await Promise.all([loadProducts(), loadCart()]);
-      setProducts(p);
+      const [result, c] = await Promise.all([loadProducts(), loadCart()]);
+      setProducts(result.data);
+      if(result.error) setLoadError(result.error);
       setCart(c);
       setLoading(false);
     })();
@@ -1231,6 +1259,11 @@ function App(){
   if(route==='admin'){
     return (
       <div className="app">
+        {loadError && (
+          <div style={{background:'#5c1c1c', color:'#f3ede3', padding:'14px 20px', fontSize:13, textAlign:'center'}}>
+            Couldn't load products: {loadError}. Check your internet connection or refresh the page.
+          </div>
+        )}
         <Admin products={products} setProducts={setProducts} fireToast={fireToast} />
         {toastNode}
       </div>
@@ -1239,6 +1272,11 @@ function App(){
 
   return (
     <div className="app">
+      {loadError && (
+        <div style={{background:'#5c1c1c', color:'#f3ede3', padding:'14px 20px', fontSize:13, textAlign:'center'}}>
+          Couldn't load products: {loadError}. Check your internet connection or refresh the page.
+        </div>
+      )}
       <div className="announce">Free delivery across Pakistan on orders over <b>Rs. 5,000</b> — Cash on Delivery available</div>
       <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} />
       {route==='home' && <Home products={products} go={go} onQuickAdd={quickAdd} />}
