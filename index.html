@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Noor & Weave — Premium Pakistani Fashion</title>
+<meta name="description" content="Hand-finished unstitched suits, stitched kurtas, and formal wear made in Pakistan. Free delivery over Rs. 5,000, Cash on Delivery available nationwide." />
+<meta property="og:title" content="Noor & Weave — Premium Pakistani Fashion" />
+<meta property="og:description" content="Hand-finished suits and kurtas built for Pakistani mornings. Shop lawns, formals, and everyday wear with Cash on Delivery." />
+<meta property="og:type" content="website" />
+<meta name="theme-color" content="#15130F" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%2315130F'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='%23B08D57' font-family='Georgia,serif'%3EN%3C/text%3E%3C/svg%3E" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -77,7 +83,7 @@
   .nav-links a{ font-size:13px; letter-spacing:0.04em; color:var(--sand-dim); transition:color .25s; position:relative; }
   .nav-links a:hover{ color:var(--ivory); }
   .nav-right{ display:flex; align-items:center; gap:20px; }
-  .icon-btn{ position:relative; font-size:19px; color:var(--ivory); padding:4px; }
+  .icon-btn{ position:relative; color:var(--ivory); padding:4px; display:flex; align-items:center; justify-content:center; }
   .cart-count{
     position:absolute; top:-6px; right:-8px; background:var(--maroon); color:var(--ivory);
     font-size:10px; font-weight:700; width:17px; height:17px; border-radius:50%;
@@ -151,6 +157,16 @@
     animation:rotateDrape 14s ease-in-out infinite;
     border:1px solid rgba(176,141,87,0.25);
   }
+  .drape-card--photo img{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+  }
+  .drape-card--photo::before{
+    content:'';
+    position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(21,19,15,0) 40%, rgba(21,19,15,0.85) 100%);
+    z-index:1;
+  }
+  .drape-card--photo .drape-label{ z-index:2; }
   .drape-card::before{
     content:'';
     position:absolute; inset:0;
@@ -198,7 +214,7 @@
   }
   .trust-cell:nth-child(4){ border-right:none; }
   @media (max-width:760px){ .trust-cell:nth-child(2){ border-right:none; } .trust-cell:nth-child(3){ border-right:1px solid var(--line); } }
-  .trust-cell .tc-icon{ font-size:20px; color:var(--brass); flex-shrink:0; }
+  .trust-cell .tc-icon{ color:var(--brass); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
   .trust-cell .tc-title{ font-size:12.5px; font-weight:600; }
   .trust-cell .tc-sub{ font-size:11px; color:var(--sand-dim); margin-top:2px; }
 
@@ -314,6 +330,19 @@
   .pd-actions{ display:flex; gap:14px; flex-wrap:wrap; }
   .back-link{ display:inline-flex; align-items:center; gap:8px; font-size:12.5px; letter-spacing:0.05em; text-transform:uppercase; color:var(--sand-dim); margin:26px 0 0; }
   .back-link:hover{ color:var(--ivory); }
+
+  /* ---------- Checkout page ---------- */
+  .checkout-wrap{ display:grid; grid-template-columns:1.3fr 1fr; gap:60px; padding:50px 0 100px; }
+  @media (max-width:860px){ .checkout-wrap{ grid-template-columns:1fr; gap:36px; } }
+  .checkout-summary{ border:1px solid var(--line); padding:26px; height:fit-content; }
+  .checkout-summary h3{ font-size:17px; margin-bottom:20px; }
+  .co-item{ display:flex; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
+  .co-item .co-name{ color:var(--ivory); }
+  .co-item .co-qty{ color:var(--sand-dim); font-size:12px; }
+  .co-total-row{ display:flex; justify-content:space-between; padding-top:16px; margin-top:6px; font-size:16px; }
+  .co-total-row strong{ color:var(--brass); }
+  .co-success{ text-align:center; padding:60px 20px; }
+  .co-success .check{ width:60px; height:60px; border-radius:50%; background:var(--maroon); display:flex; align-items:center; justify-content:center; margin:0 auto 24px; }
 
   /* ---------- Cart drawer ---------- */
   .overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:90; opacity:0; pointer-events:none; transition:opacity .3s; }
@@ -588,7 +617,7 @@ function Nav({ route, go, cartCount, openCart }){
         </div>
         <div className="nav-right">
           <button className="icon-btn" onClick={openCart} aria-label="Open cart">
-            🛍
+            <Icon.Bag size={20} />
             {cartCount>0 && <span className="cart-count">{cartCount}</span>}
           </button>
           <button className="burger" onClick={()=>setMobileOpen(v=>!v)} aria-label="Menu">☰</button>
@@ -608,7 +637,8 @@ function Nav({ route, go, cartCount, openCart }){
 }
 
 /* ---------------- Hero ---------------- */
-function Hero({ go }){
+function Hero({ go, featuredProduct }){
+  const hasRealImage = featuredProduct && featuredProduct.images && featuredProduct.images[0] && !featuredProduct.images[0].startsWith('data:image/svg+xml');
   return (
     <header className="hero">
       <div>
@@ -625,7 +655,7 @@ function Hero({ go }){
             <span className="ht-text"><strong>4.8/5</strong>2,400+ reviews</span>
           </div>
           <div className="ht-item">
-            <span className="ht-icon">↺</span>
+            <span className="ht-icon"><Icon.Return size={15} /></span>
             <span className="ht-text"><strong>7-Day</strong>Easy returns</span>
           </div>
           <div className="ht-item">
@@ -637,38 +667,61 @@ function Hero({ go }){
       <div className="hero-stage">
         <div className="drape-wrap">
           <div className="drape-back"></div>
-          <div className="drape-card">
-            <div className="drape-label">
-              <span className="eyebrow">Featured Cut</span>
-              <div className="title serif">The Zareen Drape</div>
+          {hasRealImage ? (
+            <div className="drape-card drape-card--photo" onClick={()=>go('product',{id:featuredProduct.id})} style={{cursor:'pointer'}}>
+              <img src={featuredProduct.images[0]} alt={featuredProduct.name} />
+              <div className="drape-label">
+                <span className="eyebrow">Featured Cut</span>
+                <div className="title serif">{featuredProduct.name}</div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="drape-card">
+              <div className="drape-label">
+                <span className="eyebrow">Featured Cut</span>
+                <div className="title serif">{featuredProduct ? featuredProduct.name : 'The Zareen Drape'}</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>
   );
 }
 
+/* ---------------- Icon set (clean line icons, replacing emoji) ---------------- */
+const Icon = {
+  Bag: (p) => (<svg width={p.size||18} height={p.size||18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 8h12l1 12H5L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>),
+  Truck: (p) => (<svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="1.5" y="6.5" width="12" height="10"/><path d="M13.5 10h4l3.5 3.5v3h-7.5z"/><circle cx="6" cy="18" r="1.7"/><circle cx="17" cy="18" r="1.7"/></svg>),
+  Card: (p) => (<svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="2" y="5" width="20" height="14" rx="1.5"/><path d="M2 9.5h20"/><path d="M5.5 14.5h4"/></svg>),
+  Return: (p) => (<svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 10a9 9 0 1 1 2.6 6.3"/><path d="M3 4v6h6"/></svg>),
+  Thread: (p) => (<svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="8.5"/><path d="M8 12c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5-1.8 3.5-4 3.5"/></svg>),
+  Heart: (p) => (<svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill={p.filled?"currentColor":"none"} stroke="currentColor" strokeWidth="1.6"><path d="M12 21s-7.5-4.6-10-9.2C0.3 8.2 1.8 4.5 5.3 4c2.1-.3 4 .8 6.7 3.4C14.7 4.8 16.6 3.7 18.7 4c3.5.5 5 4.2 3.3 7.8-2.5 4.6-10 9.2-10 9.2z"/></svg>),
+};
+
 /* ---------------- Trust Strip ---------------- */
 function TrustStrip(){
   const items = [
-    { icon:'🚚', title:'Free Delivery', sub:'On orders over Rs. 5,000' },
-    { icon:'💳', title:'Cash on Delivery', sub:'Pay when it arrives' },
-    { icon:'↺', title:'7-Day Returns', sub:'No questions asked' },
-    { icon:'🧵', title:'Hand-Finished', sub:'Small batch quality' },
+    { Icon: Icon.Truck, title:'Free Delivery', sub:'On orders over Rs. 5,000' },
+    { Icon: Icon.Card, title:'Cash on Delivery', sub:'Pay when it arrives' },
+    { Icon: Icon.Return, title:'7-Day Returns', sub:'No questions asked' },
+    { Icon: Icon.Thread, title:'Hand-Finished', sub:'Small batch quality' },
   ];
   return (
     <div className="trust-strip">
       <div className="container trust-grid">
-        {items.map((it,i)=>(
-          <div className="trust-cell" key={i}>
-            <span className="tc-icon">{it.icon}</span>
-            <div>
-              <div className="tc-title">{it.title}</div>
-              <div className="tc-sub">{it.sub}</div>
+        {items.map((it,i)=>{
+          const ItemIcon = it.Icon;
+          return (
+            <div className="trust-cell" key={i}>
+              <span className="tc-icon"><ItemIcon /></span>
+              <div>
+                <div className="tc-title">{it.title}</div>
+                <div className="tc-sub">{it.sub}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -697,7 +750,7 @@ function ProductCard({ p, go, onQuickAdd }){
       <div className="card-media">
         <img src={p.images[0]} alt={p.name} loading="lazy" />
         {p.featured && <span className="tag">Featured</span>}
-        <button className="wishlist" onClick={(e)=>e.stopPropagation()} aria-label="Add to wishlist">♡</button>
+        <button className="wishlist" onClick={(e)=>e.stopPropagation()} aria-label="Add to wishlist"><Icon.Heart size={15} /></button>
         <button className="card-quickadd" onClick={(e)=>{ e.stopPropagation(); onQuickAdd(p); }}>Quick Add · Rs. {p.price.toLocaleString()}</button>
       </div>
       <div className="card-info">
@@ -717,9 +770,10 @@ function Home({ products, go, onQuickAdd }){
   const featured = products.filter(p=>p.featured).slice(0,4);
   const rest = products.filter(p=>!p.featured).slice(0,4);
   const showcase = featured.length ? featured : products.slice(0,4);
+  const heroProduct = featured[0] || products[0] || null;
   return (
     <div>
-      <Hero go={go} />
+      <Hero go={go} featuredProduct={heroProduct} />
       <TrustStrip />
       <Marquee />
       <div className="container section">
@@ -789,6 +843,90 @@ function Shop({ products, params, go, onQuickAdd }){
   );
 }
 
+/* ---------------- Checkout ---------------- */
+function Checkout({ cart, products, go, clearCart }){
+  const items = cart.map(ci=>({ ...ci, product: products.find(p=>p.id===ci.id) })).filter(x=>x.product);
+  const total = items.reduce((s,x)=>s + x.product.price * x.qty, 0);
+  const [form, setForm] = useState({ name:'', phone:'', address:'', city:'' });
+  const [placed, setPlaced] = useState(false);
+
+  useEffect(()=>{
+    if(items.length===0 && !placed) go('shop',{cat:'all'});
+  }, []);
+
+  const placeOrder = (e) => {
+    e.preventDefault();
+    if(!form.name.trim() || !form.phone.trim() || !form.address.trim() || !form.city.trim()) return;
+    let lines = items.map(x=>`• ${x.product.name} × ${x.qty} — Rs. ${(x.product.price*x.qty).toLocaleString()}`).join('\n');
+    const msg = encodeURIComponent(
+      `Hi, I'd like to place an order:\n\n${lines}\n\nTotal: Rs. ${total.toLocaleString()}\n\nName: ${form.name}\nPhone: ${form.phone}\nAddress: ${form.address}\nCity: ${form.city}`
+    );
+    window.open(`https://wa.me/923000000000?text=${msg}`, '_blank');
+    setPlaced(true);
+    clearCart();
+  };
+
+  if(placed){
+    return (
+      <div className="container">
+        <div className="co-success">
+          <div className="check"><span style={{fontSize:26}}>✓</span></div>
+          <h2 className="serif" style={{fontSize:28, marginBottom:12}}>Order sent!</h2>
+          <p style={{color:'var(--sand-dim)', maxWidth:400, margin:'0 auto 24px'}}>We've opened WhatsApp with your order details. Send the message to confirm — we'll reply to finalize delivery.</p>
+          <button className="btn btn-primary" onClick={()=>go('shop',{cat:'all'})}>Continue Shopping</button>
+        </div>
+      </div>
+    );
+  }
+
+  if(items.length===0) return null;
+
+  return (
+    <div className="container">
+      <a className="back-link" href="#" onClick={(e)=>{e.preventDefault(); go('shop',{cat:'all'});}}>← Back to shop</a>
+      <div className="checkout-wrap">
+        <div>
+          <span className="eyebrow">Almost there</span>
+          <h1 className="serif" style={{fontSize:'clamp(26px,3.5vw,36px)', margin:'12px 0 30px'}}>Delivery Details</h1>
+          <form onSubmit={placeOrder}>
+            <div className="field">
+              <label>Full Name</label>
+              <input value={form.name} onChange={e=>setForm(f=>({...f, name:e.target.value}))} placeholder="Your full name" required />
+            </div>
+            <div className="field">
+              <label>Phone Number</label>
+              <input type="tel" value={form.phone} onChange={e=>setForm(f=>({...f, phone:e.target.value}))} placeholder="03XX-XXXXXXX" required />
+            </div>
+            <div className="field">
+              <label>Delivery Address</label>
+              <textarea value={form.address} onChange={e=>setForm(f=>({...f, address:e.target.value}))} placeholder="House/street, area, landmark" required />
+            </div>
+            <div className="field">
+              <label>City</label>
+              <input value={form.city} onChange={e=>setForm(f=>({...f, city:e.target.value}))} placeholder="e.g. Lahore" required />
+            </div>
+            <button className="btn btn-primary" type="submit" style={{width:'100%', justifyContent:'center', marginTop:8}}>Place Order via WhatsApp</button>
+            <p style={{fontSize:11.5, color:'var(--sand-dim)', marginTop:14, textAlign:'center'}}>Cash on Delivery — no payment needed now. We'll confirm your order on WhatsApp.</p>
+          </form>
+        </div>
+        <div className="checkout-summary">
+          <h3 className="serif">Order Summary</h3>
+          {items.map(x=>(
+            <div className="co-item" key={x.id}>
+              <div>
+                <div className="co-name">{x.product.name}</div>
+                <div className="co-qty">Qty {x.qty}</div>
+              </div>
+              <div>Rs. {(x.product.price*x.qty).toLocaleString()}</div>
+            </div>
+          ))}
+          <div className="co-total-row"><span>Total</span><strong>Rs. {total.toLocaleString()}</strong></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Product Detail ---------------- */
 function ProductDetail({ products, params, go, onAddToCart }){
   const p = products.find(x=>x.id===params?.id);
@@ -853,15 +991,14 @@ function ProductDetail({ products, params, go, onAddToCart }){
 }
 
 /* ---------------- Cart Drawer ---------------- */
-function CartDrawer({ open, close, cart, updateQty, removeItem, products }){
+function CartDrawer({ open, close, cart, updateQty, removeItem, products, go }){
   const items = cart.map(ci=>({ ...ci, product: products.find(p=>p.id===ci.id) })).filter(x=>x.product);
   const total = items.reduce((s,x)=>s + x.product.price * x.qty, 0);
 
-  const checkoutWhatsapp = () => {
+  const goToCheckout = () => {
     if(items.length===0) return;
-    let lines = items.map(x=>`• ${x.product.name} × ${x.qty} — Rs. ${(x.product.price*x.qty).toLocaleString()}`).join('\n');
-    const msg = encodeURIComponent(`Hi, I'd like to place an order:\n\n${lines}\n\nTotal: Rs. ${total.toLocaleString()}\n\nName:\nAddress:\nCity:`);
-    window.open(`https://wa.me/923000000000?text=${msg}`, '_blank');
+    close();
+    go('checkout');
   };
 
   return (
@@ -896,7 +1033,7 @@ function CartDrawer({ open, close, cart, updateQty, removeItem, products }){
         {items.length>0 && (
           <div className="drawer-foot">
             <div className="sub-row"><span>Subtotal</span><strong>Rs. {total.toLocaleString()}</strong></div>
-            <button className="btn btn-primary" onClick={checkoutWhatsapp}>Checkout via WhatsApp</button>
+            <button className="btn btn-primary" onClick={goToCheckout}>Proceed to Checkout</button>
             <button className="btn btn-outline" onClick={close}>Continue Shopping</button>
           </div>
         )}
@@ -1140,6 +1277,86 @@ function Admin({ products, setProducts, fireToast }){
 }
 
 /* ---------------- Footer ---------------- */
+/* ---------------- Info Pages (Shipping, Size Guide, Returns, Contact, Legal) ---------------- */
+const INFO_CONTENT = {
+  shipping: {
+    title: 'Shipping Info',
+    body: [
+      'We deliver across Pakistan through trusted courier partners. Most orders are dispatched within 1-2 business days of confirmation.',
+      'Standard delivery takes 3-5 business days for major cities (Lahore, Karachi, Islamabad, Rawalpindi, Faisalabad) and 5-7 business days for other areas.',
+      'Free delivery applies automatically to orders over Rs. 5,000. Orders below this amount carry a flat delivery charge of Rs. 200, calculated at checkout.',
+      'You will receive a tracking update via WhatsApp or SMS once your order is dispatched.',
+    ],
+  },
+  sizeGuide: {
+    title: 'Size Guide',
+    body: [
+      'Unstitched suits are sold as fabric sets (shirt, trouser, dupatta) and are not tied to a fixed size — your tailor can cut them to your measurements.',
+      'For stitched kurtas and ready-to-wear pieces, we follow standard Pakistani sizing: Small (36), Medium (38), Large (40), X-Large (42).',
+      'If you are unsure which size to order, message us on WhatsApp with your chest, shoulder, and length measurements and we will recommend the closest fit.',
+      'Because pieces are hand-finished in small batches, sizing may vary by half an inch from the chart — this is normal for artisan-made clothing.',
+    ],
+  },
+  returns: {
+    title: 'Returns & Exchanges',
+    body: [
+      'We offer a 7-day return window from the date of delivery for unstitched and ready-to-wear pieces, provided the item is unused, unwashed, and in its original packaging.',
+      'To start a return, message us on WhatsApp with your order details and reason for return. We will guide you through pickup or drop-off.',
+      'Refunds for Cash on Delivery orders are processed via bank transfer within 5-7 business days of us receiving the returned item.',
+      'Stitched, altered, or made-to-order pieces cannot be returned unless there is a manufacturing defect.',
+    ],
+  },
+  contact: {
+    title: 'Contact Us',
+    body: [
+      'For order questions, sizing help, or anything else, the fastest way to reach us is WhatsApp — tap the button below.',
+      'We are based in Lahore and typically respond within a few hours during business days (10am - 7pm, Monday to Saturday).',
+    ],
+    whatsapp: true,
+  },
+  privacy: {
+    title: 'Privacy Policy',
+    body: [
+      'We collect only the information needed to process your order: your name, phone number, delivery address, and order details.',
+      'Your information is used solely for order fulfillment and customer support, and is never sold or shared with third parties for marketing purposes.',
+      'Payment is handled via Cash on Delivery, so we do not store any card or banking information on this website.',
+      'If you have questions about your data, contact us via WhatsApp and we will be happy to help.',
+    ],
+  },
+  terms: {
+    title: 'Terms & Conditions',
+    body: [
+      'By placing an order with Noor & Weave, you agree to provide accurate delivery and contact information so your order can be fulfilled without delay.',
+      'Product colors may vary slightly from what is shown on screen due to differences in device displays and lighting during photography.',
+      'We reserve the right to cancel orders in cases of stock unavailability, in which case you will be notified and no payment will be charged (Cash on Delivery).',
+      'All prices are listed in Pakistani Rupees (PKR) and are subject to change without prior notice.',
+    ],
+  },
+};
+
+function InfoPage({ pageKey, go }){
+  const content = INFO_CONTENT[pageKey];
+  if(!content){
+    return (
+      <div className="container section">
+        <div className="empty-state"><h3>Page not found</h3><a className="back-link" href="#" onClick={(e)=>{e.preventDefault(); go('home');}}>← Back home</a></div>
+      </div>
+    );
+  }
+  return (
+    <div className="container" style={{padding:'60px 28px 100px', maxWidth:720}}>
+      <a className="back-link" href="#" onClick={(e)=>{e.preventDefault(); go('home');}}>← Back</a>
+      <h1 className="serif" style={{fontSize:'clamp(28px,4vw,40px)', margin:'20px 0 30px'}}>{content.title}</h1>
+      {content.body.map((para,i)=>(
+        <p key={i} style={{color:'var(--sand-dim)', lineHeight:1.8, fontSize:15, marginBottom:18}}>{para}</p>
+      ))}
+      {content.whatsapp && (
+        <button className="btn btn-primary" style={{marginTop:10}} onClick={()=>window.open('https://wa.me/923000000000','_blank')}>Message on WhatsApp</button>
+      )}
+    </div>
+  );
+}
+
 function Footer({ go }){
   return (
     <footer className="footer">
@@ -1161,10 +1378,10 @@ function Footer({ go }){
           <div>
             <h4>Help</h4>
             <ul>
-              <li><a href="#">Shipping Info</a></li>
-              <li><a href="#">Size Guide</a></li>
-              <li><a href="#">Returns</a></li>
-              <li><a href="#">Contact</a></li>
+              <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'shipping'});}}>Shipping Info</a></li>
+              <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'sizeGuide'});}}>Size Guide</a></li>
+              <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'returns'});}}>Returns</a></li>
+              <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'contact'});}}>Contact</a></li>
             </ul>
           </div>
           <div>
@@ -1172,6 +1389,8 @@ function Footer({ go }){
             <ul>
               <li><a href="#" onClick={(e)=>{e.preventDefault(); go('admin');}}>Admin Panel</a></li>
               <li><a href="https://wa.me/923000000000" target="_blank" rel="noreferrer">WhatsApp Us</a></li>
+              <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'privacy'});}}>Privacy Policy</a></li>
+              <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'terms'});}}>Terms &amp; Conditions</a></li>
             </ul>
           </div>
         </div>
@@ -1245,6 +1464,11 @@ function App(){
     fireToast('Removed from bag');
   };
 
+  const clearCart = async () => {
+    setCart([]);
+    saveCart([]);
+  };
+
   const cartCount = cart.reduce((s,x)=>s+x.qty, 0);
 
   if(loading){
@@ -1270,6 +1494,18 @@ function App(){
     );
   }
 
+  if(route==='checkout'){
+    return (
+      <div className="app">
+        <div className="announce">Free delivery across Pakistan on orders over <b>Rs. 5,000</b> — Cash on Delivery available</div>
+        <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} />
+        <Checkout cart={cart} products={products} go={go} clearCart={clearCart} />
+        <Footer go={go} />
+        {toastNode}
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       {loadError && (
@@ -1282,6 +1518,7 @@ function App(){
       {route==='home' && <Home products={products} go={go} onQuickAdd={quickAdd} />}
       {route==='shop' && <Shop products={products} params={params} go={go} onQuickAdd={quickAdd} />}
       {route==='product' && <ProductDetail products={products} params={params} go={go} onAddToCart={addToCart} />}
+      {route==='info' && <InfoPage pageKey={params.page} go={go} />}
       <Footer go={go} />
       <CartDrawer
         open={cartOpen}
@@ -1290,6 +1527,7 @@ function App(){
         updateQty={updateQty}
         removeItem={removeItem}
         products={products}
+        go={go}
       />
       {toastNode}
     </div>
