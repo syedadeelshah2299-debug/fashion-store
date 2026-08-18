@@ -354,6 +354,9 @@
     display:flex; flex-direction:column;
   }
   .drawer.open{ transform:translateX(0); }
+  @media (max-width:640px){
+    .drawer{ width:100vw; max-width:100vw; border-left:none; }
+  }
   .drawer-head{ display:flex; justify-content:space-between; align-items:center; padding:24px 26px; border-bottom:1px solid var(--line); }
   .drawer-head h3{ font-size:19px; }
   .drawer-body{ flex:1; overflow-y:auto; padding:20px 26px; }
@@ -613,7 +616,6 @@ function Nav({ route, go, cartCount, openCart }){
           <a onClick={()=>go('shop', {cat:'all'})} href="#">Shop</a>
           <a onClick={()=>go('shop', {cat:'Unstitched Suits'})} href="#">Unstitched</a>
           <a onClick={()=>go('shop', {cat:'Formal Wear'})} href="#">Formal</a>
-          <a onClick={()=>go('admin')} href="#">Admin</a>
         </div>
         <div className="nav-right">
           <button className="icon-btn" onClick={openCart} aria-label="Open cart">
@@ -629,7 +631,6 @@ function Nav({ route, go, cartCount, openCart }){
           <a onClick={()=>{go('shop',{cat:'all'}); setMobileOpen(false);}} href="#">Shop</a>
           <a onClick={()=>{go('shop',{cat:'Unstitched Suits'}); setMobileOpen(false);}} href="#">Unstitched</a>
           <a onClick={()=>{go('shop',{cat:'Formal Wear'}); setMobileOpen(false);}} href="#">Formal</a>
-          <a onClick={()=>{go('admin'); setMobileOpen(false);}} href="#">Admin</a>
         </div>
       )}
     </nav>
@@ -861,7 +862,7 @@ function Checkout({ cart, products, go, clearCart }){
     const msg = encodeURIComponent(
       `Hi, I'd like to place an order:\n\n${lines}\n\nTotal: Rs. ${total.toLocaleString()}\n\nName: ${form.name}\nPhone: ${form.phone}\nAddress: ${form.address}\nCity: ${form.city}`
     );
-    window.open(`https://wa.me/923000000000?text=${msg}`, '_blank');
+    window.open(`https://wa.me/923701672013?text=${msg}`, '_blank');
     setPlaced(true);
     clearCart();
   };
@@ -981,7 +982,7 @@ function ProductDetail({ products, params, go, onAddToCart }){
             <button className="btn btn-primary" onClick={()=>onAddToCart(p, qty)}>Add to Cart</button>
             <button className="btn btn-outline" onClick={()=>{
               const msg = encodeURIComponent(`Hi, I'd like to order:\n${p.name} × ${qty}\nPrice: Rs. ${(p.price*qty).toLocaleString()}`);
-              window.open(`https://wa.me/923000000000?text=${msg}`, '_blank');
+              window.open(`https://wa.me/923701672013?text=${msg}`, '_blank');
             }}>Order on WhatsApp</button>
           </div>
         </div>
@@ -1044,13 +1045,26 @@ function CartDrawer({ open, close, cart, updateQty, removeItem, products, go }){
 
 /* ---------------- Admin: Login ---------------- */
 function AdminLogin({ onSuccess }){
+  const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [err, setErr] = useState('');
-  const submit = (e) => {
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
     e.preventDefault();
-    if(pass === 'admin123'){ onSuccess(); }
-    else setErr('Incorrect password. Try again.');
+    setErr('');
+    if(!supabaseClient){ setErr('Connection not ready — refresh and try again.'); return; }
+    setLoading(true);
+    try{
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+      if(error){ setErr('Incorrect email or password.'); setLoading(false); return; }
+      onSuccess();
+    }catch(e){
+      setErr('Something went wrong. Try again.');
+    }
+    setLoading(false);
   };
+
   return (
     <div className="admin-login">
       <div className="login-card">
@@ -1058,13 +1072,16 @@ function AdminLogin({ onSuccess }){
         <h2 className="serif" style={{marginTop:10, marginBottom:26}}>Sign in</h2>
         <form onSubmit={submit}>
           <div className="field">
-            <label>Password</label>
-            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Enter admin password" autoFocus />
+            <label>Email</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoFocus required />
           </div>
-          <button className="btn btn-primary" type="submit" style={{width:'100%', justifyContent:'center'}}>Sign In</button>
+          <div className="field">
+            <label>Password</label>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Enter your password" required />
+          </div>
+          <button className="btn btn-primary" type="submit" style={{width:'100%', justifyContent:'center'}} disabled={loading}>{loading ? 'Signing in…' : 'Sign In'}</button>
           {err && <div className="admin-error">{err}</div>}
         </form>
-        <p style={{fontSize:11.5, color:'var(--sand-dim)', marginTop:18}}>Default password: <strong style={{color:'var(--brass)'}}>admin123</strong> — change this in the code before handing off to a client.</p>
       </div>
     </div>
   );
@@ -1272,8 +1289,36 @@ function AdminDashboard({ products, setProducts, fireToast, onLogout }){
 
 function Admin({ products, setProducts, fireToast }){
   const [authed, setAuthed] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(()=>{
+    (async ()=>{
+      if(!supabaseClient){ setChecking(false); return; }
+      try{
+        const { data } = await supabaseClient.auth.getSession();
+        setAuthed(!!(data && data.session));
+      }catch(e){}
+      setChecking(false);
+    })();
+  }, []);
+
+  const handleLogout = async () => {
+    if(supabaseClient){
+      try{ await supabaseClient.auth.signOut(); }catch(e){}
+    }
+    setAuthed(false);
+  };
+
+  if(checking){
+    return (
+      <div className="admin-login">
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
   if(!authed) return <AdminLogin onSuccess={()=>setAuthed(true)} />;
-  return <AdminDashboard products={products} setProducts={setProducts} fireToast={fireToast} onLogout={()=>setAuthed(false)} />;
+  return <AdminDashboard products={products} setProducts={setProducts} fireToast={fireToast} onLogout={handleLogout} />;
 }
 
 /* ---------------- Footer ---------------- */
@@ -1351,7 +1396,7 @@ function InfoPage({ pageKey, go }){
         <p key={i} style={{color:'var(--sand-dim)', lineHeight:1.8, fontSize:15, marginBottom:18}}>{para}</p>
       ))}
       {content.whatsapp && (
-        <button className="btn btn-primary" style={{marginTop:10}} onClick={()=>window.open('https://wa.me/923000000000','_blank')}>Message on WhatsApp</button>
+        <button className="btn btn-primary" style={{marginTop:10}} onClick={()=>window.open('https://wa.me/923701672013','_blank')}>Message on WhatsApp</button>
       )}
     </div>
   );
@@ -1387,8 +1432,7 @@ function Footer({ go }){
           <div>
             <h4>Store</h4>
             <ul>
-              <li><a href="#" onClick={(e)=>{e.preventDefault(); go('admin');}}>Admin Panel</a></li>
-              <li><a href="https://wa.me/923000000000" target="_blank" rel="noreferrer">WhatsApp Us</a></li>
+              <li><a href="https://wa.me/923701672013" target="_blank" rel="noreferrer">WhatsApp Us</a></li>
               <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'privacy'});}}>Privacy Policy</a></li>
               <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'terms'});}}>Terms &amp; Conditions</a></li>
             </ul>
@@ -1396,7 +1440,7 @@ function Footer({ go }){
         </div>
         <div className="footer-bottom">
           <span>© 2026 Noor &amp; Weave. All rights reserved.</span>
-          <span>Made for Pakistan · PKR pricing</span>
+          <span>Made for Pakistan · PKR pricing · <a href="#" onClick={(e)=>{e.preventDefault(); go('admin');}} style={{opacity:0.5, fontSize:11}}>Staff</a></span>
         </div>
       </div>
     </footer>
