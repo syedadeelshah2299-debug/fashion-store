@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -456,19 +457,69 @@ const SEED_PRODUCTS = [
   { id:'p8', name:'Noor Casual Shalwar Set', category:'Casual Wear', price:2900, desc:'An everyday shalwar kameez in soft khaddar, made for comfort without losing shape after repeated wear.', fabric:'Khaddar', images:[placeholderImg('noor1'), placeholderImg('noor2')], rating:4, featured:false },
 ];
 
-/* ---------------- Storage helpers ---------------- */
+/* ---------------- Supabase setup ---------------- */
+const SUPABASE_URL = 'https://qkysezjkclpclkmrnops.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_DK4vPx2YLcWKRqts_McmFQ_A2JHTyQ-';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* Map a Supabase row (image_url: string) to the app's product shape (images: array) */
+function rowToProduct(row){
+  return {
+    id: String(row.id),
+    name: row.name || '',
+    category: row.category || CATEGORIES[0],
+    price: Number(row.price) || 0,
+    desc: row.description || '',
+    fabric: row.fabric || '',
+    images: row.image_url ? [row.image_url] : [placeholderImg(row.name || 'product')],
+    featured: !!row.featured,
+    rating: row.rating || 4,
+  };
+}
+
+/* Map the app's product shape back to a Supabase row for insert/update */
+function productToRow(p){
+  return {
+    name: p.name,
+    category: p.category,
+    price: p.price,
+    description: p.desc,
+    image_url: p.images && p.images[0] ? p.images[0] : null,
+    featured: !!p.featured,
+  };
+}
+
+/* ---------------- Storage helpers (Supabase-backed) ---------------- */
 async function loadProducts(){
   try{
-    const res = await window.storage.get('products', true);
-    if(res && res.value) return JSON.parse(res.value);
-  }catch(e){}
-  // seed on first run
-  try{ await window.storage.set('products', JSON.stringify(SEED_PRODUCTS), true); }catch(e){}
-  return SEED_PRODUCTS;
+    const { data, error } = await supabase.from('products').select('*').order('id', { ascending:false });
+    if(error){ console.error('Supabase load error:', error); return []; }
+    if(data && data.length){ return data.map(rowToProduct); }
+    return [];
+  }catch(e){
+    console.error('Supabase load exception:', e);
+    return [];
+  }
 }
-async function saveProducts(list){
-  try{ await window.storage.set('products', JSON.stringify(list), true); }catch(e){ console.error(e); }
+
+async function insertProduct(p){
+  const { data, error } = await supabase.from('products').insert([productToRow(p)]).select();
+  if(error){ console.error('Supabase insert error:', error); throw error; }
+  return data && data[0] ? rowToProduct(data[0]) : null;
 }
+
+async function updateProductRow(id, p){
+  const { data, error } = await supabase.from('products').update(productToRow(p)).eq('id', id).select();
+  if(error){ console.error('Supabase update error:', error); throw error; }
+  return data && data[0] ? rowToProduct(data[0]) : null;
+}
+
+async function deleteProductRow(id){
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if(error){ console.error('Supabase delete error:', error); throw error; }
+}
+
+/* Cart stays local to the browser (no login system), so localStorage-free in-memory + simple persistence via window.storage if available, else memory only */
 async function loadCart(){
   try{
     const res = await window.storage.get('cart', false);
@@ -957,27 +1008,41 @@ function AdminDashboard({ products, setProducts, fireToast, onLogout }){
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async (product) => {
-    let updated;
-    if(editing){
-      updated = products.map(p=>p.id===product.id ? product : p);
-      fireToast('Product updated');
-    } else {
-      updated = [product, ...products];
-      fireToast('Product added');
+    setSaving(true);
+    try{
+      if(editing){
+        const saved = await updateProductRow(editing.id, product);
+        if(saved){
+          setProducts(products.map(p=>p.id===editing.id ? saved : p));
+          fireToast('Product updated');
+        }
+      } else {
+        const saved = await insertProduct(product);
+        if(saved){
+          setProducts([saved, ...products]);
+          fireToast('Product added');
+        }
+      }
+      setShowForm(false);
+      setEditing(null);
+    }catch(e){
+      fireToast('Error saving product — check console');
     }
-    setProducts(updated);
-    await saveProducts(updated);
-    setShowForm(false);
-    setEditing(null);
+    setSaving(false);
   };
 
   const handleDelete = async (id) => {
     if(!window.confirm('Delete this product? This cannot be undone.')) return;
-    const updated = products.filter(p=>p.id!==id);
-    setProducts(updated);
-    await saveProducts(updated);
-    fireToast('Product deleted');
+    try{
+      await deleteProductRow(id);
+      setProducts(products.filter(p=>p.id!==id));
+      fireToast('Product deleted');
+    }catch(e){
+      fireToast('Error deleting product — check console');
+    }
   };
 
   const totalValue = products.reduce((s,p)=>s+p.price,0);
@@ -1192,30 +1257,7 @@ function App(){
     </div>
   );
 }
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const supabase = window.supabase.createClient(
-    'https://qkysezjkclpclkmrnops.supabase.co',
-    'sb_publishable_DK4vPx2YLcWKRqts_McmFQ_A2JHTyQ-'
-  );
 
-  async function loadProducts() {
-    const { data, error } = await supabase.from('Products').select('*');
-    if (error) { console.error(error); return; }
-
-    const container = document.getElementById('products-container');
-    container.innerHTML = data.map(p => `
-      <div class="product-card">
-        <img src="${p.image_url}" alt="${p.name}">
-        <h3>${p.name}</h3>
-        <p>${p.description}</p>
-        <p>Rs. ${p.price}</p>
-      </div>
-    `).join('');
-  }
-
-  loadProducts();
-</script>
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
