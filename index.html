@@ -1192,7 +1192,30 @@ function App(){
     </div>
   );
 }
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://qkysezjkclpclkmrnops.supabase.co',
+    'sb_publishable_DK4vPx2YLcWKRqts_McmFQ_A2JHTyQ-'
+  );
 
+  async function loadProducts() {
+    const { data, error } = await supabase.from('Products').select('*');
+    if (error) { console.error(error); return; }
+
+    const container = document.getElementById('products-container');
+    container.innerHTML = data.map(p => `
+      <div class="product-card">
+        <img src="${p.image_url}" alt="${p.name}">
+        <h3>${p.name}</h3>
+        <p>${p.description}</p>
+        <p>Rs. ${p.price}</p>
+      </div>
+    `).join('');
+  }
+
+  loadProducts();
+</script>
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
