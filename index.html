@@ -80,8 +80,22 @@
   .brand-name{ font-size:22px; font-weight:700; letter-spacing:0.01em; }
   .brand-sub{ font-size:9px; letter-spacing:0.28em; color:var(--brass); text-transform:uppercase; margin-top:4px; }
   .nav-links{ display:flex; gap:36px; align-items:center; }
+  .nav-item{ position:relative; }
+  .nav-item > a, .nav-item > button{ font-size:13px; letter-spacing:0.04em; color:var(--sand-dim); transition:color .25s; position:relative; display:inline-flex; align-items:center; gap:4px; }
+  .nav-item:hover > a, .nav-item:hover > button{ color:var(--ivory); }
   .nav-links a{ font-size:13px; letter-spacing:0.04em; color:var(--sand-dim); transition:color .25s; position:relative; }
   .nav-links a:hover{ color:var(--ivory); }
+  .mega-caret{ font-size:9px; transition:transform .2s; }
+  .nav-item:hover .mega-caret{ transform:rotate(180deg); }
+  .mega-panel{
+    position:absolute; top:calc(100% + 18px); left:50%; transform:translateX(-50%);
+    background:var(--ink); border:1px solid var(--line); box-shadow:0 24px 48px -16px rgba(0,0,0,0.18);
+    padding:20px 24px; min-width:200px; display:none; flex-direction:column; gap:2px; z-index:60;
+  }
+  .nav-item:hover .mega-panel{ display:flex; }
+  .mega-panel a{ padding:8px 4px; font-size:13px; color:var(--sand-dim); white-space:nowrap; border-radius:2px; transition:all .15s; }
+  .mega-panel a:hover{ color:var(--maroon); padding-left:8px; }
+  .mega-panel .mega-all{ font-weight:600; color:var(--ivory); border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:6px; }
   .nav-right{ display:flex; align-items:center; gap:20px; }
   .icon-btn{ position:relative; color:var(--ivory); padding:4px; display:flex; align-items:center; justify-content:center; }
   .cart-count{
@@ -537,6 +551,12 @@ function placeholderImg(seed, w=700, h=900){
 
 /* ---------------- Seed data ---------------- */
 const CATEGORIES = ['Unstitched Suits','Stitched Kurtas','Formal Wear','Casual Wear'];
+const SUBCATEGORIES = {
+  'Unstitched Suits': ['Lawn', 'Chiffon', 'Silk', 'Cotton'],
+  'Stitched Kurtas': ['A-Line', 'Straight Cut', 'Chikankari', 'Printed'],
+  'Formal Wear': ['Sherwani', 'Bandhgala', 'Waistcoat Sets', 'Wedding Wear'],
+  'Casual Wear': ['Everyday Sets', 'Linen', 'Co-ords', 'Loungewear'],
+};
 const SEED_PRODUCTS = [
   { id:'p1', name:'Zareen Embroidered Lawn', category:'Unstitched Suits', price:6500, desc:'A three-piece unstitched lawn suit with hand-finished thread embroidery across the neckline and hem. Lightweight for daily wear, refined enough for gatherings.', fabric:'Pure Lawn', images:[placeholderImg('zareen1'), placeholderImg('zareen2')], rating:5, featured:true },
   { id:'p2', name:'Meherbano Chikankari Kurta', category:'Stitched Kurtas', price:4200, desc:'Hand chikankari work on soft cambric cotton. Relaxed silhouette, three-quarter sleeves, finished with mother-of-pearl buttons.', fabric:'Cambric Cotton', images:[placeholderImg('meher1'), placeholderImg('meher2')], rating:4, featured:true },
@@ -691,6 +711,14 @@ function AnnounceBar(){
 
 function Nav({ route, go, cartCount, openCart }){
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(null);
+
+  const navigate = (cat, sub) => {
+    go('shop', { cat, sub: sub || 'all' });
+    setMobileOpen(false);
+    setMobileExpanded(null);
+  };
+
   return (
     <nav className="nav">
       <div className="nav-inner">
@@ -699,10 +727,21 @@ function Nav({ route, go, cartCount, openCart }){
           <span className="brand-sub">Lahore · Est. Online</span>
         </div>
         <div className="nav-links">
-          <a onClick={()=>go('home')} href="#">Home</a>
-          <a onClick={()=>go('shop', {cat:'all'})} href="#">Shop</a>
-          <a onClick={()=>go('shop', {cat:'Unstitched Suits'})} href="#">Unstitched</a>
-          <a onClick={()=>go('shop', {cat:'Formal Wear'})} href="#">Formal</a>
+          <div className="nav-item"><a onClick={()=>go('home')} href="#">Home</a></div>
+          <div className="nav-item"><a onClick={()=>go('shop', {cat:'all'})} href="#">Shop All</a></div>
+          {CATEGORIES.map(cat=>(
+            <div className="nav-item" key={cat}>
+              <a href="#" onClick={(e)=>{e.preventDefault(); navigate(cat);}}>
+                {cat} <span className="mega-caret">▾</span>
+              </a>
+              <div className="mega-panel">
+                <a href="#" className="mega-all" onClick={(e)=>{e.preventDefault(); navigate(cat);}}>All {cat}</a>
+                {(SUBCATEGORIES[cat]||[]).map(sub=>(
+                  <a key={sub} href="#" onClick={(e)=>{e.preventDefault(); navigate(cat, sub);}}>{sub}</a>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
         <div className="nav-right">
           <button className="icon-btn" onClick={openCart} aria-label="Open cart">
@@ -713,11 +752,26 @@ function Nav({ route, go, cartCount, openCart }){
         </div>
       </div>
       {mobileOpen && (
-        <div style={{padding:'0 28px 20px', display:'flex', flexDirection:'column', gap:16}}>
-          <a onClick={()=>{go('home'); setMobileOpen(false);}} href="#">Home</a>
-          <a onClick={()=>{go('shop',{cat:'all'}); setMobileOpen(false);}} href="#">Shop</a>
-          <a onClick={()=>{go('shop',{cat:'Unstitched Suits'}); setMobileOpen(false);}} href="#">Unstitched</a>
-          <a onClick={()=>{go('shop',{cat:'Formal Wear'}); setMobileOpen(false);}} href="#">Formal</a>
+        <div style={{padding:'0 28px 20px', display:'flex', flexDirection:'column', gap:4}}>
+          <a onClick={()=>{go('home'); setMobileOpen(false);}} href="#" style={{padding:'10px 0'}}>Home</a>
+          <a onClick={()=>navigate('all')} href="#" style={{padding:'10px 0'}}>Shop All</a>
+          {CATEGORIES.map(cat=>(
+            <div key={cat}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0'}}>
+                <a href="#" onClick={(e)=>{e.preventDefault(); navigate(cat);}} style={{padding:0}}>{cat}</a>
+                <button onClick={()=>setMobileExpanded(x=>x===cat?null:cat)} style={{fontSize:16, color:'var(--brass)', padding:'4px 8px'}}>
+                  {mobileExpanded===cat ? '−' : '+'}
+                </button>
+              </div>
+              {mobileExpanded===cat && (
+                <div style={{display:'flex', flexDirection:'column', paddingLeft:16, gap:2, marginBottom:6}}>
+                  {(SUBCATEGORIES[cat]||[]).map(sub=>(
+                    <a key={sub} href="#" onClick={(e)=>{e.preventDefault(); navigate(cat, sub);}} style={{padding:'8px 0', fontSize:13, color:'var(--sand-dim)'}}>{sub}</a>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </nav>
@@ -896,14 +950,20 @@ function FAQSection(){
 
 function Home({ products, go, onQuickAdd }){
   const featured = products.filter(p=>p.featured).slice(0,4);
-  const rest = products.filter(p=>!p.featured).slice(0,4);
   const showcase = featured.length ? featured : products.slice(0,4);
   const heroProduct = featured[0] || products[0] || null;
+
+  const newArrivals = useMemo(()=>[...products].slice(0,4), [products]); // products load newest-first from Supabase already
+  const saleItems = useMemo(()=>products.filter(p=>p.originalPrice && p.originalPrice > p.price).slice(0,4), [products]);
+  const bestSellers = useMemo(()=>[...products].sort((a,b)=>(b.rating||0)-(a.rating||0)).slice(0,4), [products]);
+  const rest = products.filter(p=>!p.featured).slice(0,4);
+
   return (
     <div>
       <Hero go={go} featuredProduct={heroProduct} />
       <TrustStrip />
       <Marquee />
+
       <div className="container section">
         <div className="section-head">
           <div>
@@ -920,6 +980,43 @@ function Home({ products, go, onQuickAdd }){
           </div>
         )}
       </div>
+
+      {newArrivals.length>0 && (
+        <div className="container section" style={{paddingTop:0}}>
+          <div className="section-head">
+            <div><span className="eyebrow">Just In</span><h2>New Arrivals</h2></div>
+            <a className="view-all" href="#" onClick={(e)=>{e.preventDefault(); go('shop',{cat:'all'});}}>View All →</a>
+          </div>
+          <div className="grid">
+            {newArrivals.map(p=>(<ProductCard key={p.id} p={p} go={go} onQuickAdd={onQuickAdd} />))}
+          </div>
+        </div>
+      )}
+
+      {saleItems.length>0 && (
+        <div className="container section" style={{paddingTop:0}}>
+          <div className="section-head">
+            <div><span className="eyebrow">Limited Time</span><h2>On Sale</h2></div>
+            <a className="view-all" href="#" onClick={(e)=>{e.preventDefault(); go('shop',{cat:'all'});}}>View All →</a>
+          </div>
+          <div className="grid">
+            {saleItems.map(p=>(<ProductCard key={p.id} p={p} go={go} onQuickAdd={onQuickAdd} />))}
+          </div>
+        </div>
+      )}
+
+      {bestSellers.length>0 && (
+        <div className="container section" style={{paddingTop:0}}>
+          <div className="section-head">
+            <div><span className="eyebrow">Customer Favorites</span><h2>Best Sellers</h2></div>
+            <a className="view-all" href="#" onClick={(e)=>{e.preventDefault(); go('shop',{cat:'all'});}}>View All →</a>
+          </div>
+          <div className="grid">
+            {bestSellers.map(p=>(<ProductCard key={p.id} p={p} go={go} onQuickAdd={onQuickAdd} />))}
+          </div>
+        </div>
+      )}
+
       {rest.length>0 && (
         <div className="container section" style={{paddingTop:0}}>
           <div className="section-head">
@@ -938,29 +1035,37 @@ function Home({ products, go, onQuickAdd }){
 /* ---------------- Shop ---------------- */
 function Shop({ products, params, go, onQuickAdd }){
   const [cat, setCat] = useState(params?.cat || 'all');
+  const [sub, setSub] = useState(params?.sub || 'all');
   const [q, setQ] = useState('');
-  useEffect(()=>{ setCat(params?.cat || 'all'); }, [params]);
+  useEffect(()=>{ setCat(params?.cat || 'all'); setSub(params?.sub || 'all'); }, [params]);
 
   const filtered = useMemo(()=>{
     return products.filter(p=>{
       const catOk = cat==='all' || p.category===cat;
+      const subOk = sub==='all' || (p.name.toLowerCase().includes(sub.toLowerCase()) || (p.desc||'').toLowerCase().includes(sub.toLowerCase()));
       const qOk = q.trim()==='' || p.name.toLowerCase().includes(q.toLowerCase()) || p.category.toLowerCase().includes(q.toLowerCase());
-      return catOk && qOk;
+      return catOk && subOk && qOk;
     });
-  }, [products, cat, q]);
+  }, [products, cat, sub, q]);
 
   return (
     <div className="container section">
       <div className="section-head">
-        <div><span className="eyebrow">Full Collection</span><h2>Shop All</h2></div>
+        <div><span className="eyebrow">Full Collection</span><h2>{sub!=='all' ? sub : 'Shop All'}</h2></div>
       </div>
       <div className="filter-bar">
-        <button className={`chip ${cat==='all'?'active':''}`} onClick={()=>setCat('all')}>All</button>
+        <button className={`chip ${cat==='all'?'active':''}`} onClick={()=>{setCat('all'); setSub('all');}}>All</button>
         {CATEGORIES.map(c=>(
-          <button key={c} className={`chip ${cat===c?'active':''}`} onClick={()=>setCat(c)}>{c}</button>
+          <button key={c} className={`chip ${cat===c?'active':''}`} onClick={()=>{setCat(c); setSub('all');}}>{c}</button>
         ))}
         <input className="search-input" placeholder="Search products..." value={q} onChange={e=>setQ(e.target.value)} />
       </div>
+      {sub!=='all' && (
+        <div style={{marginBottom:24, fontSize:12.5, color:'var(--sand-dim)'}}>
+          Filtering by: <strong style={{color:'var(--brass)'}}>{sub}</strong>
+          <button onClick={()=>setSub('all')} style={{marginLeft:10, color:'var(--maroon)', textDecoration:'underline'}}>Clear</button>
+        </div>
+      )}
       {filtered.length===0 ? (
         <div className="empty-state"><h3>No products found</h3><p>Try a different filter or search term.</p></div>
       ) : (
