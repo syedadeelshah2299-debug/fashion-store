@@ -380,6 +380,19 @@
   .star-picker button.active{ color:var(--brass); }
   .no-reviews{ color:var(--sand-dim); font-size:13.5px; padding:20px 0; }
 
+  /* ---------- Account ---------- */
+  .account-wrap{ max-width:420px; margin:0 auto; padding:60px 20px 100px; }
+  .account-tabs{ display:flex; border-bottom:1px solid var(--line); margin-bottom:30px; }
+  .account-tab{ flex:1; text-align:center; padding:14px; font-size:13px; letter-spacing:0.05em; text-transform:uppercase; color:var(--sand-dim); border-bottom:2px solid transparent; }
+  .account-tab.active{ color:var(--maroon); border-bottom-color:var(--maroon); font-weight:600; }
+  .account-panel{ border:1px solid var(--line); padding:32px 28px; }
+  .account-panel h3{ font-size:20px; margin-bottom:6px; }
+  .account-panel .sub{ color:var(--sand-dim); font-size:13px; margin-bottom:24px; }
+  .review-own-actions{ display:flex; gap:14px; margin-top:8px; }
+  .order-row{ border:1px solid var(--line); padding:16px; margin-bottom:10px; }
+  .order-row .or-top{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px; }
+  .order-row .or-total{ color:var(--brass); font-weight:600; }
+
   /* ---------- FAQ ---------- */
   .faq-item{ border-bottom:1px solid var(--line); }
   .faq-q{
@@ -666,16 +679,84 @@ async function insertReview(review){
   return data && data[0] ? data[0] : null;
 }
 
-/* Cart stays local to the browser (no login system), so localStorage-free in-memory + simple persistence via window.storage if available, else memory only */
-async function loadCart(){
+async function updateReview(id, updates){
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { data, error } = await supabaseClient.from('reviews').update(updates).eq('id', id).select();
+  if(error){ console.error('Supabase review update error:', error); throw error; }
+  return data && data[0] ? data[0] : null;
+}
+
+async function deleteReview(id){
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { error } = await supabaseClient.from('reviews').delete().eq('id', id);
+  if(error){ console.error('Supabase review delete error:', error); throw error; }
+}
+
+/* ---------------- Customer Auth ---------------- */
+async function customerSignUp(email, password){
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { data, error } = await supabaseClient.auth.signUp({ email, password });
+  if(error) throw error;
+  return data;
+}
+
+async function customerSignIn(email, password){
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error) throw error;
+  return data;
+}
+
+async function customerSignOut(){
+  if(!supabaseClient) return;
+  try{ await supabaseClient.auth.signOut(); }catch(e){}
+}
+
+async function getCurrentSession(){
+  if(!supabaseClient) return null;
+  try{
+    const { data } = await supabaseClient.auth.getSession();
+    return data && data.session ? data.session : null;
+  }catch(e){ return null; }
+}
+
+/* ---------------- Cart (Supabase-backed when logged in, browser-local otherwise) ---------------- */
+async function loadCart(userId){
+  if(userId && supabaseClient){
+    try{
+      const { data, error } = await supabaseClient.from('carts').select('items').eq('user_id', userId).maybeSingle();
+      if(!error && data) return data.items || [];
+    }catch(e){ console.error('Cart load error:', e); }
+    return [];
+  }
   try{
     const res = await window.storage.get('cart', false);
     if(res && res.value) return JSON.parse(res.value);
   }catch(e){}
   return [];
 }
-async function saveCart(cart){
+
+async function saveCart(cart, userId){
+  if(userId && supabaseClient){
+    try{
+      await supabaseClient.from('carts').upsert({ user_id: userId, items: cart, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    }catch(e){ console.error('Cart save error:', e); }
+    return;
+  }
   try{ await window.storage.set('cart', JSON.stringify(cart), false); }catch(e){}
+}
+
+async function mergeCartsOnLogin(userId, localCart){
+  if(!supabaseClient || !userId) return localCart;
+  const remoteCart = await loadCart(userId);
+  const merged = [...remoteCart];
+  localCart.forEach(localItem=>{
+    const existing = merged.find(x=>x.id===localItem.id);
+    if(existing){ existing.qty += localItem.qty; }
+    else{ merged.push(localItem); }
+  });
+  await saveCart(merged, userId);
+  return merged;
 }
 
 /* ---------------- Toast ---------------- */
@@ -709,7 +790,7 @@ function AnnounceBar(){
   );
 }
 
-function Nav({ route, go, cartCount, openCart }){
+function Nav({ route, go, cartCount, openCart, session }){
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState(null);
 
@@ -744,6 +825,9 @@ function Nav({ route, go, cartCount, openCart }){
           ))}
         </div>
         <div className="nav-right">
+          <button className="icon-btn" onClick={()=>go('account')} aria-label="Account">
+            <Icon.User size={19} />
+          </button>
           <button className="icon-btn" onClick={openCart} aria-label="Open cart">
             <Icon.Bag size={20} />
             {cartCount>0 && <span className="cart-count">{cartCount}</span>}
@@ -753,6 +837,7 @@ function Nav({ route, go, cartCount, openCart }){
       </div>
       {mobileOpen && (
         <div style={{padding:'0 28px 20px', display:'flex', flexDirection:'column', gap:4}}>
+          <a onClick={()=>{go('account'); setMobileOpen(false);}} href="#" style={{padding:'10px 0'}}>{session ? 'My Account' : 'Log In / Sign Up'}</a>
           <a onClick={()=>{go('home'); setMobileOpen(false);}} href="#" style={{padding:'10px 0'}}>Home</a>
           <a onClick={()=>navigate('all')} href="#" style={{padding:'10px 0'}}>Shop All</a>
           {CATEGORIES.map(cat=>(
@@ -839,6 +924,7 @@ const Icon = {
   Return: (p) => (<svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 10a9 9 0 1 1 2.6 6.3"/><path d="M3 4v6h6"/></svg>),
   Thread: (p) => (<svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="8.5"/><path d="M8 12c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5-1.8 3.5-4 3.5"/></svg>),
   Heart: (p) => (<svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill={p.filled?"currentColor":"none"} stroke="currentColor" strokeWidth="1.6"><path d="M12 21s-7.5-4.6-10-9.2C0.3 8.2 1.8 4.5 5.3 4c2.1-.3 4 .8 6.7 3.4C14.7 4.8 16.6 3.7 18.7 4c3.5.5 5 4.2 3.3 7.8-2.5 4.6-10 9.2-10 9.2z"/></svg>),
+  User: (p) => (<svg width={p.size||18} height={p.size||18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6"/></svg>),
 };
 
 /* ---------------- Trust Strip ---------------- */
@@ -1078,6 +1164,142 @@ function Shop({ products, params, go, onQuickAdd }){
 }
 
 /* ---------------- Checkout ---------------- */
+/* ---------------- Account ---------------- */
+function AccountAuth({ onAuthed }){
+  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [signupDone, setSignupDone] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setErr(''); setLoading(true);
+    try{
+      if(mode==='login'){
+        await customerSignIn(email, pass);
+        onAuthed();
+      } else {
+        await customerSignUp(email, pass);
+        setSignupDone(true);
+      }
+    }catch(e){
+      setErr(e.message || 'Something went wrong. Try again.');
+    }
+    setLoading(false);
+  };
+
+  if(signupDone){
+    return (
+      <div className="account-panel">
+        <h3 className="serif">Check your email</h3>
+        <p className="sub">We've sent a confirmation link to {email}. Confirm your email, then log in below.</p>
+        <button className="btn btn-outline" onClick={()=>{ setSignupDone(false); setMode('login'); }}>Back to Login</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="account-tabs">
+        <button className={`account-tab ${mode==='login'?'active':''}`} onClick={()=>{setMode('login'); setErr('');}}>Log In</button>
+        <button className={`account-tab ${mode==='signup'?'active':''}`} onClick={()=>{setMode('signup'); setErr('');}}>Sign Up</button>
+      </div>
+      <div className="account-panel">
+        <h3 className="serif">{mode==='login' ? 'Welcome back' : 'Create your account'}</h3>
+        <p className="sub">{mode==='login' ? 'Log in to see your saved cart and reviews.' : 'Save your cart, track your reviews, and check out faster.'}</p>
+        <form onSubmit={submit}>
+          <div className="field">
+            <label>Email</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" required />
+          </div>
+          <div className="field">
+            <label>Password</label>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="At least 6 characters" minLength={6} required />
+          </div>
+          <button className="btn btn-primary" type="submit" style={{width:'100%', justifyContent:'center'}} disabled={loading}>
+            {loading ? 'Please wait…' : mode==='login' ? 'Log In' : 'Sign Up'}
+          </button>
+          {err && <div className="admin-error">{err}</div>}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AccountProfile({ session, onLogout, fireToast }){
+  const [myReviews, setMyReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+
+  useEffect(()=>{
+    (async ()=>{
+      if(!supabaseClient) { setLoadingReviews(false); return; }
+      try{
+        const { data, error } = await supabaseClient.from('reviews').select('*').eq('user_id', session.user.id).order('created_at', { ascending:false });
+        if(!error) setMyReviews(data || []);
+      }catch(e){}
+      setLoadingReviews(false);
+    })();
+  }, [session]);
+
+  const handleDeleteReview = async (id) => {
+    if(!window.confirm('Delete this review?')) return;
+    try{
+      await deleteReview(id);
+      setMyReviews(r=>r.filter(x=>x.id!==id));
+      fireToast('Review deleted');
+    }catch(e){
+      fireToast('Could not delete review');
+    }
+  };
+
+  return (
+    <div>
+      <div className="account-panel" style={{marginBottom:24}}>
+        <h3 className="serif">My Account</h3>
+        <p className="sub">{session.user.email}</p>
+        <button className="btn btn-outline" onClick={onLogout}>Log Out</button>
+      </div>
+      <div className="account-panel">
+        <h4 style={{fontSize:15, marginBottom:16}}>My Reviews</h4>
+        {loadingReviews ? (
+          <p className="no-reviews">Loading…</p>
+        ) : myReviews.length===0 ? (
+          <p className="no-reviews">You haven't written any reviews yet.</p>
+        ) : (
+          myReviews.map(r=>(
+            <div className="review-card" key={r.id}>
+              <div className="review-top">
+                <div><Stars n={r.rating} /></div>
+                <div className="review-date">{new Date(r.created_at).toLocaleDateString('en-PK', { day:'numeric', month:'short', year:'numeric' })}</div>
+              </div>
+              <div className="review-text">{r.comment}</div>
+              <div className="review-own-actions">
+                <button className="link-btn danger" onClick={()=>handleDeleteReview(r.id)}>Delete</button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Account({ session, onAuthed, onLogout, fireToast }){
+  return (
+    <div className="container">
+      <div className="account-wrap">
+        {session ? (
+          <AccountProfile session={session} onLogout={onLogout} fireToast={fireToast} />
+        ) : (
+          <AccountAuth onAuthed={onAuthed} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Checkout({ cart, products, go, clearCart }){
   const items = cart.map(ci=>({ ...ci, product: products.find(p=>p.id===ci.id) })).filter(x=>x.product);
   const total = items.reduce((s,x)=>s + x.product.price * x.qty, 0);
@@ -1200,7 +1422,7 @@ function SizeChart({ category }){
 }
 
 /* ---------------- Reviews ---------------- */
-function ReviewForm({ productId, onSubmitted }){
+function ReviewForm({ productId, session, onSubmitted }){
   const [name, setName] = useState('');
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
@@ -1213,7 +1435,7 @@ function ReviewForm({ productId, onSubmitted }){
     setSubmitting(true);
     setErr('');
     try{
-      const saved = await insertReview({ product_id: productId, name: name.trim(), rating, comment: comment.trim() });
+      const saved = await insertReview({ product_id: productId, user_id: session.user.id, name: name.trim(), rating, comment: comment.trim() });
       if(saved){
         onSubmitted(saved);
         setName(''); setComment(''); setRating(5);
@@ -1246,7 +1468,7 @@ function ReviewForm({ productId, onSubmitted }){
   );
 }
 
-function ReviewsSection({ productId }){
+function ReviewsSection({ productId, session, go }){
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -1260,6 +1482,20 @@ function ReviewsSection({ productId }){
 
   const avgRating = reviews.length ? (reviews.reduce((s,r)=>s+r.rating,0) / reviews.length) : 0;
 
+  const handleDelete = async (id) => {
+    if(!window.confirm('Delete your review?')) return;
+    try{
+      await deleteReview(id);
+      setReviews(r=>r.filter(x=>x.id!==id));
+    }catch(e){}
+  };
+
+  const writeButton = session ? (
+    <button className="btn btn-outline" onClick={()=>setShowForm(v=>!v)}>{showForm ? 'Cancel' : 'Write a Review'}</button>
+  ) : (
+    <button className="btn btn-outline" onClick={()=>go('account')}>Log In to Write a Review</button>
+  );
+
   return (
     <div className="reviews-section">
       <div className="reviews-head">
@@ -1272,11 +1508,11 @@ function ReviewsSection({ productId }){
             </div>
           )}
         </div>
-        <button className="btn btn-outline" onClick={()=>setShowForm(v=>!v)}>{showForm ? 'Cancel' : 'Write a Review'}</button>
+        {writeButton}
       </div>
 
-      {showForm && (
-        <ReviewForm productId={productId} onSubmitted={(newReview)=>{ setReviews(r=>[newReview, ...r]); setShowForm(false); }} />
+      {showForm && session && (
+        <ReviewForm productId={productId} session={session} onSubmitted={(newReview)=>{ setReviews(r=>[newReview, ...r]); setShowForm(false); }} />
       )}
 
       {loading ? (
@@ -1295,6 +1531,11 @@ function ReviewsSection({ productId }){
                 <div className="review-date">{new Date(r.created_at).toLocaleDateString('en-PK', { day:'numeric', month:'short', year:'numeric' })}</div>
               </div>
               <div className="review-text">{r.comment}</div>
+              {session && r.user_id===session.user.id && (
+                <div className="review-own-actions">
+                  <button className="link-btn danger" onClick={()=>handleDelete(r.id)}>Delete</button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1303,7 +1544,7 @@ function ReviewsSection({ productId }){
   );
 }
 
-function ProductDetail({ products, params, go, onAddToCart }){
+function ProductDetail({ products, params, go, onAddToCart, session }){
   const p = products.find(x=>x.id===params?.id);
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
@@ -1370,7 +1611,7 @@ function ProductDetail({ products, params, go, onAddToCart }){
           </div>
         </div>
       </div>
-      <ReviewsSection productId={p.id} />
+      <ReviewsSection productId={p.id} session={session} go={go} />
     </div>
   );
 }
@@ -1854,16 +2095,26 @@ function App(){
   const [cartOpen, setCartOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  const [session, setSession] = useState(null);
   const [fireToast, toastNode] = useToast();
 
   useEffect(()=>{
     (async ()=>{
-      const [result, c] = await Promise.all([loadProducts(), loadCart()]);
+      const [result, sess] = await Promise.all([loadProducts(), getCurrentSession()]);
       setProducts(result.data);
       if(result.error) setLoadError(result.error);
+      setSession(sess);
+      const c = await loadCart(sess ? sess.user.id : null);
       setCart(c);
       setLoading(false);
     })();
+
+    if(supabaseClient){
+      const { data: listener } = supabaseClient.auth.onAuthStateChange((event, newSession) => {
+        setSession(newSession);
+      });
+      return () => { if(listener && listener.subscription) listener.subscription.unsubscribe(); };
+    }
   }, []);
 
   const go = (r, p={}) => {
@@ -1871,7 +2122,27 @@ function App(){
     window.scrollTo({top:0, behavior:'instant'});
   };
 
+  const handleAuthed = async () => {
+    const sess = await getCurrentSession();
+    setSession(sess);
+    if(sess){
+      const merged = await mergeCartsOnLogin(sess.user.id, cart);
+      setCart(merged);
+      fireToast('Logged in');
+    }
+    go('account');
+  };
+
+  const handleLogout = async () => {
+    await customerSignOut();
+    setSession(null);
+    setCart([]);
+    fireToast('Logged out');
+    go('home');
+  };
+
   const addToCart = async (product, qty=1) => {
+    const uid = session ? session.user.id : null;
     setCart(prev=>{
       const existing = prev.find(x=>x.id===product.id);
       let updated;
@@ -1880,7 +2151,7 @@ function App(){
       } else {
         updated = [...prev, { id:product.id, qty }];
       }
-      saveCart(updated);
+      saveCart(updated, uid);
       return updated;
     });
     fireToast(`Added "${product.name}" to bag`);
@@ -1890,25 +2161,28 @@ function App(){
   const quickAdd = (product) => addToCart(product, 1);
 
   const updateQty = async (id, qty) => {
+    const uid = session ? session.user.id : null;
     setCart(prev=>{
       const updated = prev.map(x=>x.id===id ? {...x, qty} : x);
-      saveCart(updated);
+      saveCart(updated, uid);
       return updated;
     });
   };
 
   const removeItem = async (id) => {
+    const uid = session ? session.user.id : null;
     setCart(prev=>{
       const updated = prev.filter(x=>x.id!==id);
-      saveCart(updated);
+      saveCart(updated, uid);
       return updated;
     });
     fireToast('Removed from bag');
   };
 
   const clearCart = async () => {
+    const uid = session ? session.user.id : null;
     setCart([]);
-    saveCart([]);
+    saveCart([], uid);
   };
 
   const cartCount = cart.reduce((s,x)=>s+x.qty, 0);
@@ -1940,7 +2214,7 @@ function App(){
     return (
       <div className="app">
         <AnnounceBar />
-        <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} />
+        <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} session={session} />
         <Checkout cart={cart} products={products} go={go} clearCart={clearCart} />
         <Footer go={go} />
         {toastNode}
@@ -1956,11 +2230,12 @@ function App(){
         </div>
       )}
       <AnnounceBar />
-      <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} />
+      <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} session={session} />
       {route==='home' && <Home products={products} go={go} onQuickAdd={quickAdd} />}
       {route==='shop' && <Shop products={products} params={params} go={go} onQuickAdd={quickAdd} />}
-      {route==='product' && <ProductDetail products={products} params={params} go={go} onAddToCart={addToCart} />}
+      {route==='product' && <ProductDetail products={products} params={params} go={go} onAddToCart={addToCart} session={session} />}
       {route==='info' && <InfoPage pageKey={params.page} go={go} />}
+      {route==='account' && <Account session={session} onAuthed={handleAuthed} onLogout={handleLogout} fireToast={fireToast} />}
       <Footer go={go} />
       <CartDrawer
         open={cartOpen}
