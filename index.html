@@ -18,14 +18,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#15130F;
-    --ivory:#F3EDE3;
-    --maroon:#7A2E2E;
-    --maroon-light:#9c4040;
-    --brass:#B08D57;
-    --sand:#DCD2BE;
-    --sand-dim:#c9bda3;
-    --line: rgba(243,237,227,0.14);
+    --ink:#FBF9F6;
+    --ivory:#2C2825;
+    --maroon:#B87E8A;
+    --maroon-light:#A56674;
+    --brass:#9C7A5E;
+    --sand:#F3EEE6;
+    --sand-dim:#7A7268;
+    --line: rgba(44,40,37,0.12);
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html{scroll-behavior:smooth;}
@@ -47,7 +47,7 @@
   a{color:inherit; text-decoration:none;}
   button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit;}
   img{display:block; max-width:100%;}
-  ::selection{background:var(--maroon); color:var(--ivory);}
+  ::selection{background:var(--maroon); color:#FBF9F6;}
 
   /* reduced motion */
   @media (prefers-reduced-motion: reduce){
@@ -62,7 +62,7 @@
 
   /* ---------- Announcement bar ---------- */
   .announce{
-    background:var(--maroon); color:var(--ivory); text-align:center;
+    background:var(--maroon); color:#FBF9F6; text-align:center;
     padding:10px 20px; font-size:12px; letter-spacing:0.06em; font-weight:500;
     position:relative; z-index:60;
   }
@@ -71,7 +71,7 @@
   /* ---------- Nav ---------- */
   .nav{
     position:sticky; top:0; z-index:50;
-    background:rgba(21,19,15,0.92);
+    background:rgba(251,249,246,0.92);
     backdrop-filter:blur(14px);
     border-bottom:1px solid var(--line);
   }
@@ -85,7 +85,7 @@
   .nav-right{ display:flex; align-items:center; gap:20px; }
   .icon-btn{ position:relative; color:var(--ivory); padding:4px; display:flex; align-items:center; justify-content:center; }
   .cart-count{
-    position:absolute; top:-6px; right:-8px; background:var(--maroon); color:var(--ivory);
+    position:absolute; top:-6px; right:-8px; background:var(--maroon); color:#FBF9F6;
     font-size:10px; font-weight:700; width:17px; height:17px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
   }
@@ -129,8 +129,8 @@
     padding:16px 32px; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; font-weight:600;
     transition:all .25s cubic-bezier(.2,.8,.2,1); display:inline-flex; align-items:center; gap:8px; border:1px solid transparent;
   }
-  .btn-primary{ background:var(--maroon); color:var(--ivory); box-shadow:0 1px 0 rgba(255,255,255,0.08) inset, 0 12px 24px -10px rgba(122,46,46,0.55); }
-  .btn-primary:hover{ background:var(--maroon-light); transform:translateY(-2px); box-shadow:0 1px 0 rgba(255,255,255,0.1) inset, 0 18px 30px -10px rgba(122,46,46,0.6); }
+  .btn-primary{ background:var(--maroon); color:#FBF9F6; box-shadow:0 1px 0 rgba(255,255,255,0.15) inset, 0 12px 24px -10px rgba(184,126,138,0.5); }
+  .btn-primary:hover{ background:var(--maroon-light); transform:translateY(-2px); box-shadow:0 1px 0 rgba(255,255,255,0.15) inset, 0 18px 30px -10px rgba(184,126,138,0.55); }
   .btn-outline{ border-color:var(--line); color:var(--ivory); }
   .btn-outline:hover{ border-color:var(--brass); color:var(--brass); background:rgba(176,141,87,0.06); }
 
@@ -182,9 +182,10 @@
   }
   .drape-label{
     position:absolute; bottom:22px; left:22px; right:22px;
+    color:#F3EDE3;
   }
-  .drape-label .eyebrow{ color:var(--sand); opacity:0.85; }
-  .drape-label .title{ font-family:'Playfair Display',serif; font-size:20px; margin-top:6px; }
+  .drape-label .eyebrow{ color:#D9A5AE; opacity:0.9; }
+  .drape-label .title{ font-family:'Playfair Display',serif; font-size:20px; margin-top:6px; color:#F3EDE3; }
   .drape-back{
     position:absolute; width:260px; height:380px; border-radius:4px;
     background:linear-gradient(155deg, #2a2620, #1a1712);
@@ -221,7 +222,7 @@
   /* ---------- Marquee strip ---------- */
   .marquee-strip{
     border-top:1px solid var(--line); border-bottom:1px solid var(--line);
-    padding:16px 0; overflow:hidden; white-space:nowrap; background:rgba(243,237,227,0.02);
+    padding:16px 0; overflow:hidden; white-space:nowrap; background:rgba(42,39,36,0.02);
   }
   .marquee-track{ display:inline-flex; gap:60px; animation:marquee 28s linear infinite; }
   .marquee-track span{ font-family:'Playfair Display',serif; font-style:italic; font-size:15px; color:var(--sand-dim); letter-spacing:0.02em; }
@@ -263,13 +264,13 @@
   .card-media .wishlist{
     position:absolute; top:12px; right:12px; width:32px; height:32px; border-radius:50%;
     background:rgba(21,19,15,0.6); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center;
-    font-size:14px; opacity:0; transition:opacity .25s ease;
+    font-size:14px; opacity:0; transition:opacity .25s ease; color:#F3EDE3;
   }
   .card:hover .card-media .wishlist{ opacity:1; }
   .card-quickadd{
     position:absolute; bottom:0; left:0; right:0; background:rgba(21,19,15,0.95); backdrop-filter:blur(8px);
     padding:13px; text-align:center; font-size:10.5px; letter-spacing:0.12em; text-transform:uppercase;
-    transform:translateY(100%); transition:transform .35s cubic-bezier(.2,.8,.2,1); color:var(--ivory); font-weight:600;
+    transform:translateY(100%); transition:transform .35s cubic-bezier(.2,.8,.2,1); color:#F3EDE3; font-weight:600;
     border-top:1px solid rgba(176,141,87,0.25);
   }
   .card:hover .card-quickadd{ transform:translateY(0); }
@@ -278,6 +279,14 @@
   .card-info .cname{ font-family:'Playfair Display',serif; font-size:16.5px; line-height:1.3; }
   .card-info .cmeta{ display:flex; justify-content:space-between; align-items:center; margin-top:9px; }
   .card-info .cprice{ color:var(--ivory); font-size:14.5px; font-weight:600; }
+  .price-row{ display:flex; align-items:baseline; gap:8px; }
+  .price-original{ color:var(--sand-dim); font-size:12px; text-decoration:line-through; }
+  .sale-badge{
+    position:absolute; top:14px; right:14px; background:var(--maroon); color:#FBF9F6;
+    font-size:9.5px; letter-spacing:0.08em; text-transform:uppercase; padding:6px 10px; font-weight:700;
+  }
+  .pd-price-row{ display:flex; align-items:baseline; gap:14px; margin-bottom:24px; }
+  .pd-price-original{ color:var(--sand-dim); font-size:16px; text-decoration:line-through; }
   .card-info .cstars{ font-size:11px; }
 
   .empty-state{
@@ -357,6 +366,18 @@
   .star-picker button.active{ color:var(--brass); }
   .no-reviews{ color:var(--sand-dim); font-size:13.5px; padding:20px 0; }
 
+  /* ---------- FAQ ---------- */
+  .faq-item{ border-bottom:1px solid var(--line); }
+  .faq-q{
+    width:100%; text-align:left; padding:20px 0; display:flex; justify-content:space-between; align-items:center;
+    font-size:15px; font-weight:500; color:var(--ivory);
+  }
+  .faq-q .plus{ font-size:20px; color:var(--brass); transition:transform .2s; flex-shrink:0; margin-left:16px; }
+  .faq-item.open .plus{ transform:rotate(45deg); }
+  .faq-a{ overflow:hidden; max-height:0; transition:max-height .3s ease; }
+  .faq-item.open .faq-a{ max-height:300px; }
+  .faq-a p{ padding-bottom:20px; color:var(--sand-dim); font-size:13.5px; line-height:1.7; max-width:640px; }
+
   /* ---------- Checkout page ---------- */
   .checkout-wrap{ display:grid; grid-template-columns:1.3fr 1fr; gap:60px; padding:50px 0 100px; }
   @media (max-width:860px){ .checkout-wrap{ grid-template-columns:1fr; gap:36px; } }
@@ -399,7 +420,7 @@
   .drawer-foot .btn{ width:100%; justify-content:center; margin-bottom:10px; }
 
   /* ---------- Admin ---------- */
-  .admin-shell{ min-height:100vh; background:#0e0c09; }
+  .admin-shell{ min-height:100vh; background:var(--ink); }
   .admin-nav{ display:flex; justify-content:space-between; align-items:center; padding:20px 32px; border-bottom:1px solid var(--line); }
   .admin-body{ padding:32px; max-width:1100px; margin:0 auto; }
   .admin-login{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
@@ -407,7 +428,7 @@
   .field{ margin-bottom:18px; }
   .field label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--sand-dim); margin-bottom:8px; }
   .field input, .field textarea, .field select{
-    width:100%; background:rgba(243,237,227,0.04); border:1px solid var(--line); color:var(--ivory);
+    width:100%; background:rgba(42,39,36,0.03); border:1px solid var(--line); color:var(--ivory);
     padding:12px 14px; font-size:14px; font-family:inherit;
   }
   .field textarea{ resize:vertical; min-height:90px; }
@@ -437,7 +458,7 @@
   .stat-box .lbl{ font-size:11.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--sand-dim); margin-top:6px; }
   .toast{
     position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
-    background:var(--maroon); color:var(--ivory); padding:14px 26px; font-size:13px; letter-spacing:0.03em;
+    background:var(--maroon); color:#FBF9F6; padding:14px 26px; font-size:13px; letter-spacing:0.03em;
     z-index:200; transition:all .3s; pointer-events:none;
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
@@ -452,7 +473,7 @@
 </head>
 <body>
 <div id="root">
-  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#15130F; color:#F3EDE3; font-family:sans-serif; padding:20px; text-align:center;">
+  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#FBF9F6; color:#2C2825; font-family:sans-serif; padding:20px; text-align:center;">
     <div>
       <p style="margin-bottom:10px;">Loading store…</p>
       <p style="font-size:12px; opacity:0.6;">If this message doesn't go away, there may be a script loading issue. Try refreshing, or check your connection.</p>
@@ -550,6 +571,7 @@ function rowToProduct(row){
     name: row.name || '',
     category: row.category || CATEGORIES[0],
     price: Number(row.price) || 0,
+    originalPrice: row.original_price ? Number(row.original_price) : null,
     desc: row.description || '',
     fabric: row.fabric || '',
     images: row.image_url ? [row.image_url] : [placeholderImg(row.name || 'product')],
@@ -564,6 +586,7 @@ function productToRow(p){
     name: p.name,
     category: p.category,
     price: p.price,
+    original_price: p.originalPrice || null,
     description: p.desc,
     image_url: p.images && p.images[0] ? p.images[0] : null,
     featured: !!p.featured,
@@ -648,6 +671,24 @@ function useToast(){
 }
 
 /* ---------------- Nav ---------------- */
+/* ---------------- Announcement Bar (rotating messages) ---------------- */
+const ANNOUNCE_MESSAGES = [
+  <React.Fragment key="a1">Free delivery across Pakistan on orders over <b>Rs. 5,000</b></React.Fragment>,
+  <React.Fragment key="a2">Cash on Delivery available nationwide — pay when it arrives</React.Fragment>,
+  <React.Fragment key="a3">Hand-finished pieces, made in small batches — 7-day easy returns</React.Fragment>,
+];
+
+function AnnounceBar(){
+  const [idx, setIdx] = useState(0);
+  useEffect(()=>{
+    const t = setInterval(()=>setIdx(i=>(i+1) % ANNOUNCE_MESSAGES.length), 4000);
+    return ()=>clearInterval(t);
+  }, []);
+  return (
+    <div className="announce">{ANNOUNCE_MESSAGES[idx]}</div>
+  );
+}
+
 function Nav({ route, go, cartCount, openCart }){
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
@@ -792,11 +833,13 @@ function Stars({ n }){
   return <span className="stars">{'★'.repeat(n)}{'☆'.repeat(5-n)}</span>;
 }
 function ProductCard({ p, go, onQuickAdd }){
+  const onSale = p.originalPrice && p.originalPrice > p.price;
   return (
     <div className="card" onClick={()=>go('product',{id:p.id})}>
       <div className="card-media">
         <img src={p.images[0]} alt={p.name} loading="lazy" />
         {p.featured && <span className="tag">Featured</span>}
+        {onSale && <span className="sale-badge">Sale</span>}
         <button className="wishlist" onClick={(e)=>e.stopPropagation()} aria-label="Add to wishlist"><Icon.Heart size={15} /></button>
         <button className="card-quickadd" onClick={(e)=>{ e.stopPropagation(); onQuickAdd(p); }}>Quick Add · Rs. {p.price.toLocaleString()}</button>
       </div>
@@ -804,7 +847,10 @@ function ProductCard({ p, go, onQuickAdd }){
         <span className="ccat">{p.category}</span>
         <div className="cname serif">{p.name}</div>
         <div className="cmeta">
-          <span className="cprice">Rs. {p.price.toLocaleString()}</span>
+          <span className="price-row">
+            <span className="cprice">Rs. {p.price.toLocaleString()}</span>
+            {onSale && <span className="price-original">Rs. {p.originalPrice.toLocaleString()}</span>}
+          </span>
           <span className="cstars"><Stars n={p.rating || 4} /></span>
         </div>
       </div>
@@ -813,6 +859,41 @@ function ProductCard({ p, go, onQuickAdd }){
 }
 
 /* ---------------- Home ---------------- */
+/* ---------------- FAQ ---------------- */
+const FAQ_ITEMS = [
+  { q: 'What products does Noor & Weave offer?', a: 'We offer unstitched lawn and embroidered suits, stitched kurtas, formal wear like sherwanis and bandhgalas, and everyday casual sets — all hand-finished in small batches.' },
+  { q: 'Do you offer free delivery?', a: 'Yes, delivery is free across Pakistan on orders over Rs. 5,000. Orders below that carry a flat delivery charge, shown at checkout.' },
+  { q: 'How can I place an order?', a: "Browse the shop, add items to your bag, and check out with your name, phone, and address. We confirm every order over WhatsApp — Cash on Delivery, so you don't pay until it arrives." },
+  { q: 'Can I return or exchange an item?', a: 'Yes, unstitched and ready-to-wear pieces can be returned within 7 days if unused and in original packaging. See our Returns page for details.' },
+  { q: 'How do I know what size to order?', a: 'Each stitched product page has a size chart with chest, waist, shoulder, and length measurements. If unsure, message us on WhatsApp with your measurements for a recommendation.' },
+];
+
+function FAQItem({ item }){
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`faq-item ${open?'open':''}`}>
+      <button className="faq-q" onClick={()=>setOpen(v=>!v)}>
+        {item.q}
+        <span className="plus">+</span>
+      </button>
+      <div className="faq-a"><p>{item.a}</p></div>
+    </div>
+  );
+}
+
+function FAQSection(){
+  return (
+    <div className="container section" style={{paddingTop:0, maxWidth:820}}>
+      <div className="section-head" style={{marginBottom:20}}>
+        <div><span className="eyebrow">Questions</span><h2>Frequently Asked</h2></div>
+      </div>
+      <div>
+        {FAQ_ITEMS.map((item,i)=>(<FAQItem key={i} item={item} />))}
+      </div>
+    </div>
+  );
+}
+
 function Home({ products, go, onQuickAdd }){
   const featured = products.filter(p=>p.featured).slice(0,4);
   const rest = products.filter(p=>!p.featured).slice(0,4);
@@ -849,6 +930,7 @@ function Home({ products, go, onQuickAdd }){
           </div>
         </div>
       )}
+      <FAQSection />
     </div>
   );
 }
@@ -1151,8 +1233,16 @@ function ProductDetail({ products, params, go, onAddToCart }){
             <Stars n={p.rating || 4} />
             <span style={{fontSize:12.5, color:'var(--sand-dim)'}}>({Math.floor((p.id.charCodeAt(1)||50) * 3.7)} reviews)</span>
           </div>
-          <div className="pd-price" style={{marginTop:18}}>Rs. {p.price.toLocaleString()}</div>
-          <p className="pd-desc">{p.desc}</p>
+          <div className="pd-price-row" style={{marginTop:18, marginBottom:0}}>
+            <span className="pd-price" style={{marginBottom:0}}>Rs. {p.price.toLocaleString()}</span>
+            {p.originalPrice && p.originalPrice > p.price && (
+              <React.Fragment>
+                <span className="pd-price-original">Rs. {p.originalPrice.toLocaleString()}</span>
+                <span className="sale-badge" style={{position:'static'}}>Sale</span>
+              </React.Fragment>
+            )}
+          </div>
+          <p className="pd-desc" style={{marginTop:24}}>{p.desc}</p>
           <SizeChart category={p.category} />
           <div className="pd-meta-row">
             <div><span className="k">Fabric</span><span className="v">{p.fabric || '—'}</span></div>
@@ -1278,7 +1368,7 @@ function AdminLogin({ onSuccess }){
 
 /* ---------------- Admin: Product Form ---------------- */
 function emptyProduct(){
-  return { id:'', name:'', category:CATEGORIES[0], price:'', desc:'', fabric:'', images:[], featured:false, rating:5 };
+  return { id:'', name:'', category:CATEGORIES[0], price:'', originalPrice:'', desc:'', fabric:'', images:[], featured:false, rating:5 };
 }
 
 function ProductForm({ initial, onSave, onCancel }){
@@ -1307,6 +1397,7 @@ function ProductForm({ initial, onSave, onCancel }){
       ...form,
       id: form.id || ('p_' + Date.now()),
       price: Number(form.price),
+      originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
       images: finalImages,
     });
   };
@@ -1324,6 +1415,13 @@ function ProductForm({ initial, onSave, onCancel }){
             <label>Price (PKR)</label>
             <input type="number" min="0" value={form.price} onChange={e=>setForm(f=>({...f, price:e.target.value}))} placeholder="e.g. 4500" required />
           </div>
+        </div>
+        <div className="field-row">
+          <div className="field">
+            <label>Original Price (Optional — for Sale badge)</label>
+            <input type="number" min="0" value={form.originalPrice} onChange={e=>setForm(f=>({...f, originalPrice:e.target.value}))} placeholder="e.g. 5500 (leave blank if not on sale)" />
+          </div>
+          <div></div>
         </div>
         <div className="field-row">
           <div className="field">
@@ -1627,6 +1725,12 @@ function Footer({ go }){
             </ul>
           </div>
         </div>
+        <div style={{display:'flex', gap:10, marginBottom:22, flexWrap:'wrap'}}>
+          <span style={{border:'1px solid var(--line)', padding:'6px 12px', fontSize:11, letterSpacing:'0.04em', color:'var(--sand-dim)'}}>Cash on Delivery</span>
+          <span style={{border:'1px solid var(--line)', padding:'6px 12px', fontSize:11, letterSpacing:'0.04em', color:'var(--sand-dim)'}}>Bank Transfer</span>
+          <span style={{border:'1px solid var(--line)', padding:'6px 12px', fontSize:11, letterSpacing:'0.04em', color:'var(--sand-dim)'}}>EasyPaisa</span>
+          <span style={{border:'1px solid var(--line)', padding:'6px 12px', fontSize:11, letterSpacing:'0.04em', color:'var(--sand-dim)'}}>JazzCash</span>
+        </div>
         <div className="footer-bottom">
           <span>© 2026 Noor &amp; Weave. All rights reserved.</span>
           <span>Made for Pakistan · PKR pricing · <a href="#" onClick={(e)=>{e.preventDefault(); go('admin');}} style={{opacity:0.5, fontSize:11}}>Staff</a></span>
@@ -1730,7 +1834,7 @@ function App(){
   if(route==='checkout'){
     return (
       <div className="app">
-        <div className="announce">Free delivery across Pakistan on orders over <b>Rs. 5,000</b> — Cash on Delivery available</div>
+        <AnnounceBar />
         <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} />
         <Checkout cart={cart} products={products} go={go} clearCart={clearCart} />
         <Footer go={go} />
@@ -1746,7 +1850,7 @@ function App(){
           Couldn't load products: {loadError}. Check your internet connection or refresh the page.
         </div>
       )}
-      <div className="announce">Free delivery across Pakistan on orders over <b>Rs. 5,000</b> — Cash on Delivery available</div>
+      <AnnounceBar />
       <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} />
       {route==='home' && <Home products={products} go={go} onQuickAdd={quickAdd} />}
       {route==='shop' && <Shop products={products} params={params} go={go} onQuickAdd={quickAdd} />}
