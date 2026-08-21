@@ -782,6 +782,32 @@ async function deleteReview(id){
   if(error){ console.error('Supabase review delete error:', error); throw error; }
 }
 
+/* ---------------- Orders (handled fully inside the website) ---------------- */
+async function insertOrder(order){
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { data, error } = await supabaseClient.from('orders').insert([order]).select();
+  if(error){ console.error('Supabase order insert error:', error); throw error; }
+  return data && data[0] ? data[0] : null;
+}
+
+async function loadOrders(){
+  if(!supabaseClient) return [];
+  try{
+    const { data, error } = await supabaseClient.from('orders').select('*').order('created_at', { ascending:false });
+    if(error){ console.error('Supabase orders load error:', error); return []; }
+    return data || [];
+  }catch(e){
+    console.error('Supabase orders load exception:', e);
+    return [];
+  }
+}
+
+async function updateOrderStatus(id, status){
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { error } = await supabaseClient.from('orders').update({ status }).eq('id', id);
+  if(error){ console.error('Supabase order status update error:', error); throw error; }
+}
+
 /* ---------------- Customer Auth ---------------- */
 async function customerSignUp(email, password){
   if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
@@ -1093,9 +1119,9 @@ function ProductCard({ p, go, onQuickAdd }){
 const FAQ_ITEMS = [
   { q: 'What products does Noor & Weave offer?', a: 'We offer unstitched lawn and embroidered suits, stitched kurtas, formal wear like sherwanis and bandhgalas, and everyday casual sets — all hand-finished in small batches.' },
   { q: 'Do you offer free delivery?', a: 'Yes, delivery is free across Pakistan on orders over Rs. 5,000. Orders below that carry a flat delivery charge, shown at checkout.' },
-  { q: 'How can I place an order?', a: "Browse the shop, add items to your bag, and check out with your name, phone, and address. We confirm every order over WhatsApp — Cash on Delivery, so you don't pay until it arrives." },
+  { q: 'How can I place an order?', a: "Browse the shop, add items to your bag, and complete checkout right on the website with your name, phone, and address — Cash on Delivery, so you don't pay until it arrives." },
   { q: 'Can I return or exchange an item?', a: 'Yes, unstitched and ready-to-wear pieces can be returned within 7 days if unused and in original packaging. See our Returns page for details.' },
-  { q: 'How do I know what size to order?', a: 'Each stitched product page has a size chart with chest, waist, shoulder, and length measurements. If unsure, message us on WhatsApp with your measurements for a recommendation.' },
+  { q: 'How do I know what size to order?', a: 'Each stitched product page has a size chart with chest, waist, shoulder, and length measurements. If unsure, email us with your measurements for a recommendation.' },
 ];
 
 function FAQItem({ item }){
@@ -1419,21 +1445,34 @@ function Checkout({ cart, products, go, clearCart }){
   const total = items.reduce((s,x)=>s + x.product.price * x.qty, 0);
   const [form, setForm] = useState({ name:'', phone:'', address:'', city:'' });
   const [placed, setPlaced] = useState(false);
+  const [placing, setPlacing] = useState(false);
+  const [orderErr, setOrderErr] = useState('');
 
   useEffect(()=>{
     if(items.length===0 && !placed) go('shop',{cat:'all'});
   }, []);
 
-  const placeOrder = (e) => {
+  const placeOrder = async (e) => {
     e.preventDefault();
     if(!form.name.trim() || !form.phone.trim() || !form.address.trim() || !form.city.trim()) return;
-    let lines = items.map(x=>`• ${x.product.name} × ${x.qty} — Rs. ${(x.product.price*x.qty).toLocaleString()}`).join('\n');
-    const msg = encodeURIComponent(
-      `Hi, I'd like to place an order:\n\n${lines}\n\nTotal: Rs. ${total.toLocaleString()}\n\nName: ${form.name}\nPhone: ${form.phone}\nAddress: ${form.address}\nCity: ${form.city}`
-    );
-    window.open(`https://wa.me/923701672013?text=${msg}`, '_blank');
-    setPlaced(true);
-    clearCart();
+    setPlacing(true);
+    setOrderErr('');
+    try{
+      await insertOrder({
+        items: items.map(x=>({ id:x.id, name:x.product.name, qty:x.qty, price:x.product.price })),
+        customer_name: form.name.trim(),
+        phone: form.phone.trim(),
+        address: form.address.trim(),
+        city: form.city.trim(),
+        total: total,
+        status: 'pending',
+      });
+      setPlaced(true);
+      clearCart();
+    }catch(err){
+      setOrderErr("Couldn't place your order — please check your connection and try again.");
+    }
+    setPlacing(false);
   };
 
   if(placed){
@@ -1441,8 +1480,8 @@ function Checkout({ cart, products, go, clearCart }){
       <div className="container">
         <div className="co-success">
           <div className="check"><span style={{fontSize:26}}>✓</span></div>
-          <h2 className="serif" style={{fontSize:28, marginBottom:12}}>Order sent!</h2>
-          <p style={{color:'var(--sand-dim)', maxWidth:400, margin:'0 auto 24px'}}>We've opened WhatsApp with your order details. Send the message to confirm — we'll reply to finalize delivery.</p>
+          <h2 className="serif" style={{fontSize:28, marginBottom:12}}>Order placed!</h2>
+          <p style={{color:'var(--sand-dim)', maxWidth:400, margin:'0 auto 24px'}}>Your order has been received. We'll contact you shortly to confirm delivery — Cash on Delivery, so no payment is needed now.</p>
           <button className="btn btn-primary" onClick={()=>go('shop',{cat:'all'})}>Continue Shopping</button>
         </div>
       </div>
@@ -1475,8 +1514,9 @@ function Checkout({ cart, products, go, clearCart }){
               <label>City</label>
               <input value={form.city} onChange={e=>setForm(f=>({...f, city:e.target.value}))} placeholder="e.g. Lahore" required />
             </div>
-            <button className="btn btn-primary" type="submit" style={{width:'100%', justifyContent:'center', marginTop:8}}>Place Order via WhatsApp</button>
-            <p style={{fontSize:11.5, color:'var(--sand-dim)', marginTop:14, textAlign:'center'}}>Cash on Delivery — no payment needed now. We'll confirm your order on WhatsApp.</p>
+            <button className="btn btn-primary" type="submit" style={{width:'100%', justifyContent:'center', marginTop:8}} disabled={placing}>{placing ? 'Placing Order…' : 'Complete Order'}</button>
+            {orderErr && <div className="admin-error" style={{textAlign:'center', marginTop:10}}>{orderErr}</div>}
+            <p style={{fontSize:11.5, color:'var(--sand-dim)', marginTop:14, textAlign:'center'}}>Cash on Delivery — no payment needed now. We'll contact you to confirm delivery details.</p>
           </form>
         </div>
         <div className="checkout-summary">
@@ -1658,7 +1698,7 @@ function ReviewsSection({ productId, session, go }){
   );
 }
 
-function ProductDetail({ products, params, go, onAddToCart, session }){
+function ProductDetail({ products, params, go, onAddToCart, onBuyNow, session }){
   const p = products.find(x=>x.id===params?.id);
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
@@ -1717,11 +1757,8 @@ function ProductDetail({ products, params, go, onAddToCart, session }){
             </div>
           </div>
           <div className="pd-actions">
-            <button className="btn btn-primary" onClick={()=>onAddToCart(p, qty)}>Add to Cart</button>
-            <button className="btn btn-outline" onClick={()=>{
-              const msg = encodeURIComponent(`Hi, I'd like to order:\n${p.name} × ${qty}\nPrice: Rs. ${(p.price*qty).toLocaleString()}`);
-              window.open(`https://wa.me/923701672013?text=${msg}`, '_blank');
-            }}>Order on WhatsApp</button>
+            <button className="btn btn-outline" onClick={()=>onAddToCart(p, qty)}>Add to Cart</button>
+            <button className="btn btn-primary" onClick={()=>onBuyNow(p, qty)}>Buy Now</button>
           </div>
         </div>
       </div>
@@ -2031,6 +2068,73 @@ function CategoryManager({ categories, categoryImages, refreshCategories, fireTo
   );
 }
 
+function AdminOrders({ fireToast }){
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = async () => {
+    setLoading(true);
+    const data = await loadOrders();
+    setOrders(data);
+    setLoading(false);
+  };
+
+  useEffect(()=>{ refresh(); }, []);
+
+  const handleStatusChange = async (id, status) => {
+    try{
+      await updateOrderStatus(id, status);
+      setOrders(o=>o.map(x=>x.id===id ? {...x, status} : x));
+      fireToast('Order updated');
+    }catch(e){
+      fireToast('Error updating order');
+    }
+  };
+
+  return (
+    <div className="admin-panel-box">
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
+        <h3 className="serif" style={{margin:0}}>Orders</h3>
+        <button className="link-btn" onClick={refresh}>Refresh</button>
+      </div>
+      {loading ? (
+        <p className="no-reviews">Loading orders…</p>
+      ) : orders.length===0 ? (
+        <div className="empty-state"><h3>No orders yet</h3><p>Orders placed on the website will appear here.</p></div>
+      ) : (
+        <div style={{overflowX:'auto'}}>
+          <table className="admin-table">
+            <thead>
+              <tr><th>Date</th><th>Customer</th><th>Phone</th><th>Address</th><th>Items</th><th>Total</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {orders.map(o=>(
+                <tr key={o.id}>
+                  <td>{new Date(o.created_at).toLocaleDateString('en-PK', { day:'numeric', month:'short', year:'numeric' })}</td>
+                  <td>{o.customer_name}</td>
+                  <td>{o.phone}</td>
+                  <td style={{maxWidth:180}}>{o.address}, {o.city}</td>
+                  <td>{(o.items||[]).map(it=>`${it.name} ×${it.qty}`).join(', ')}</td>
+                  <td>Rs. {Number(o.total).toLocaleString()}</td>
+                  <td>
+                    <select value={o.status} onChange={e=>handleStatusChange(o.id, e.target.value)} style={{background:'rgba(42,39,36,0.03)', border:'1px solid var(--line)', color:'var(--ivory)', padding:'8px 10px', fontSize:12.5}}>
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminDashboard({ products, setProducts, fireToast, onLogout, categories, refreshCategories, categoryImages }){
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -2089,6 +2193,8 @@ function AdminDashboard({ products, setProducts, fireToast, onLogout, categories
           <div className="stat-box"><div className="num serif">{products.filter(p=>p.featured).length}</div><div className="lbl">Featured Items</div></div>
           <div className="stat-box"><div className="num serif">Rs. {totalValue.toLocaleString()}</div><div className="lbl">Catalog Value</div></div>
         </div>
+
+        <AdminOrders fireToast={fireToast} />
 
         <CategoryManager categories={categories} categoryImages={categoryImages} refreshCategories={refreshCategories} fireToast={fireToast} />
 
@@ -2180,7 +2286,7 @@ const INFO_CONTENT = {
       'We deliver across Pakistan through trusted courier partners. Most orders are dispatched within 1-2 business days of confirmation.',
       'Standard delivery takes 3-5 business days for major cities (Lahore, Karachi, Islamabad, Rawalpindi, Faisalabad) and 5-7 business days for other areas.',
       'Free delivery applies automatically to orders over Rs. 5,000. Orders below this amount carry a flat delivery charge of Rs. 200, calculated at checkout.',
-      'You will receive a tracking update via WhatsApp or SMS once your order is dispatched.',
+      'You will receive a tracking update via email or SMS once your order is dispatched.',
     ],
   },
   sizeGuide: {
@@ -2188,7 +2294,7 @@ const INFO_CONTENT = {
     body: [
       'Unstitched suits are sold as fabric sets (shirt, trouser, dupatta) and are not tied to a fixed size — your tailor can cut them to your measurements.',
       'For stitched kurtas and ready-to-wear pieces, we follow standard Pakistani sizing: Small (36), Medium (38), Large (40), X-Large (42).',
-      'If you are unsure which size to order, message us on WhatsApp with your chest, shoulder, and length measurements and we will recommend the closest fit.',
+      'If you are unsure which size to order, email us with your chest, shoulder, and length measurements and we will recommend the closest fit.',
       'Because pieces are hand-finished in small batches, sizing may vary by half an inch from the chart — this is normal for artisan-made clothing.',
     ],
   },
@@ -2196,7 +2302,7 @@ const INFO_CONTENT = {
     title: 'Returns & Exchanges',
     body: [
       'We offer a 7-day return window from the date of delivery for unstitched and ready-to-wear pieces, provided the item is unused, unwashed, and in its original packaging.',
-      'To start a return, message us on WhatsApp with your order details and reason for return. We will guide you through pickup or drop-off.',
+      'To start a return, email us with your order details and reason for return. We will guide you through pickup or drop-off.',
       'Refunds for Cash on Delivery orders are processed via bank transfer within 5-7 business days of us receiving the returned item.',
       'Stitched, altered, or made-to-order pieces cannot be returned unless there is a manufacturing defect.',
     ],
@@ -2204,10 +2310,10 @@ const INFO_CONTENT = {
   contact: {
     title: 'Contact Us',
     body: [
-      'For order questions, sizing help, or anything else, the fastest way to reach us is WhatsApp — tap the button below.',
+      'For order questions, sizing help, or anything else, the fastest way to reach us is email — tap the button below.',
       'We are based in Lahore and typically respond within a few hours during business days (10am - 7pm, Monday to Saturday).',
     ],
-    whatsapp: true,
+    email: true,
   },
   privacy: {
     title: 'Privacy Policy',
@@ -2215,7 +2321,7 @@ const INFO_CONTENT = {
       'We collect only the information needed to process your order: your name, phone number, delivery address, and order details.',
       'Your information is used solely for order fulfillment and customer support, and is never sold or shared with third parties for marketing purposes.',
       'Payment is handled via Cash on Delivery, so we do not store any card or banking information on this website.',
-      'If you have questions about your data, contact us via WhatsApp and we will be happy to help.',
+      'If you have questions about your data, email us and we will be happy to help.',
     ],
   },
   terms: {
@@ -2245,8 +2351,8 @@ function InfoPage({ pageKey, go }){
       {content.body.map((para,i)=>(
         <p key={i} style={{color:'var(--sand-dim)', lineHeight:1.8, fontSize:15, marginBottom:18}}>{para}</p>
       ))}
-      {content.whatsapp && (
-        <button className="btn btn-primary" style={{marginTop:10}} onClick={()=>window.open('https://wa.me/923701672013','_blank')}>Message on WhatsApp</button>
+      {content.email && (
+        <a className="btn btn-primary" style={{marginTop:10, display:'inline-flex'}} href="mailto:noorweavefashion@gmail.com">Email Us</a>
       )}
     </div>
   );
@@ -2282,7 +2388,7 @@ function Footer({ go }){
           <div>
             <h4>Store</h4>
             <ul>
-              <li><a href="https://wa.me/923701672013" target="_blank" rel="noreferrer">WhatsApp Us</a></li>
+              <li><a href="mailto:noorweavefashion@gmail.com">Email Us</a></li>
               <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'privacy'});}}>Privacy Policy</a></li>
               <li><a href="#" onClick={(e)=>{e.preventDefault(); go('info',{page:'terms'});}}>Terms &amp; Conditions</a></li>
             </ul>
@@ -2387,6 +2493,22 @@ function App(){
 
   const quickAdd = (product) => addToCart(product, 1);
 
+  const buyNow = (product, qty=1) => {
+    const uid = session ? session.user.id : null;
+    setCart(prev=>{
+      const existing = prev.find(x=>x.id===product.id);
+      let updated;
+      if(existing){
+        updated = prev.map(x=>x.id===product.id ? {...x, qty:x.qty+qty} : x);
+      } else {
+        updated = [...prev, { id:product.id, qty }];
+      }
+      saveCart(updated, uid);
+      return updated;
+    });
+    go('checkout');
+  };
+
   const updateQty = async (id, qty) => {
     const uid = session ? session.user.id : null;
     setCart(prev=>{
@@ -2460,7 +2582,7 @@ function App(){
       <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} session={session} categories={categories} />
       {route==='home' && <Home products={products} go={go} onQuickAdd={quickAdd} categories={categories} categoryImages={categoryImages} />}
       {route==='shop' && <Shop products={products} params={params} go={go} onQuickAdd={quickAdd} categories={categories} />}
-      {route==='product' && <ProductDetail products={products} params={params} go={go} onAddToCart={addToCart} session={session} />}
+      {route==='product' && <ProductDetail products={products} params={params} go={go} onAddToCart={addToCart} onBuyNow={buyNow} session={session} />}
       {route==='info' && <InfoPage pageKey={params.page} go={go} />}
       {route==='account' && <Account session={session} onAuthed={handleAuthed} onLogout={handleLogout} fireToast={fireToast} />}
       <Footer go={go} />
