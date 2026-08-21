@@ -511,6 +511,25 @@
 
   .badge-row{ display:flex; gap:10px; margin-top:6px; }
   .stars{ color:var(--brass); font-size:13px; letter-spacing:2px; }
+
+  /* ---------- Top Subcategories ---------- */
+  .subcat-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:22px 18px; }
+  @media (max-width:700px){ .subcat-grid{ gap:14px 10px; } }
+  .subcat-card{ cursor:pointer; text-align:center; }
+  .subcat-media{
+    aspect-ratio:1/1; border-radius:8px; overflow:hidden; background:var(--sand);
+    box-shadow:0 1px 2px rgba(0,0,0,0.18); transition:transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s ease;
+    border:1px solid var(--line);
+  }
+  .subcat-card:hover .subcat-media{ transform:translateY(-5px); box-shadow:0 20px 32px -14px rgba(0,0,0,0.4); }
+  .subcat-media img{ width:100%; height:100%; object-fit:cover; transition:transform .5s ease; }
+  .subcat-card:hover .subcat-media img{ transform:scale(1.06); }
+  .subcat-label{ margin-top:11px; font-size:12.5px; font-weight:600; letter-spacing:0.02em; color:var(--ivory); }
+  @media (max-width:560px){
+    .subcat-grid{ grid-template-columns:repeat(4, 1fr); gap:10px 8px; }
+    .subcat-media{ border-radius:6px; }
+    .subcat-label{ font-size:9.5px; margin-top:7px; line-height:1.25; }
+  }
 </style>
 </head>
 <body>
@@ -696,9 +715,9 @@ async function loadCategories(){
   }
 }
 
-async function insertCategory(name){
+async function insertCategory(name, image_url){
   if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
-  const { data, error } = await supabaseClient.from('categories').insert([{ name }]).select();
+  const { data, error } = await supabaseClient.from('categories').insert([{ name, image_url: image_url || null }]).select();
   if(error){ console.error('Supabase category insert error:', error); throw error; }
   return data && data[0] ? data[0] : null;
 }
@@ -707,6 +726,27 @@ async function deleteCategory(name){
   if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
   const { error } = await supabaseClient.from('categories').delete().eq('name', name);
   if(error){ console.error('Supabase category delete error:', error); throw error; }
+}
+
+/* Loads a map of { categoryName: image_url } for categories that have an image set */
+async function loadCategoryImages(){
+  if(!supabaseClient) return {};
+  try{
+    const { data, error } = await supabaseClient.from('categories').select('name,image_url').order('name', { ascending:true });
+    if(error){ console.error('Supabase category images load error:', error); return {}; }
+    const map = {};
+    (data || []).forEach(c=>{ if(c.image_url) map[c.name] = c.image_url; });
+    return map;
+  }catch(e){
+    console.error('Supabase category images load exception:', e);
+    return {};
+  }
+}
+
+async function updateCategoryImage(name, image_url){
+  if(!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const { error } = await supabaseClient.from('categories').update({ image_url }).eq('name', name);
+  if(error){ console.error('Supabase category image update error:', error); throw error; }
 }
 
 /* ---------------- Reviews ---------------- */
@@ -1084,7 +1124,30 @@ function FAQSection(){
   );
 }
 
-function Home({ products, go, onQuickAdd }){
+/* ---------------- Top Subcategories (image tiles, like a category shortcuts row) ---------------- */
+function TopSubcategories({ categories, categoryImages, go }){
+  if(!categories || categories.length===0) return null;
+  return (
+    <div className="container section" style={{paddingTop:0, paddingBottom:20}}>
+      <div className="section-head" style={{marginBottom:26}}>
+        <div><span className="eyebrow">Explore</span><h2>Top Categories</h2></div>
+      </div>
+      <div className="subcat-grid">
+        {categories.map(cat=>{
+          const img = (categoryImages && categoryImages[cat]) || placeholderImg(cat, 300, 300);
+          return (
+            <div className="subcat-card" key={cat} onClick={()=>go('shop',{cat})}>
+              <div className="subcat-media"><img src={img} alt={cat} loading="lazy" /></div>
+              <div className="subcat-label">{cat}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Home({ products, go, onQuickAdd, categories, categoryImages }){
   const featured = products.filter(p=>p.featured).slice(0,4);
   const showcase = featured.length ? featured : products.slice(0,4);
   const heroProduct = featured[0] || products[0] || null;
@@ -1099,8 +1162,9 @@ function Home({ products, go, onQuickAdd }){
       <Hero go={go} featuredProduct={heroProduct} />
       <TrustStrip />
       <Marquee />
+      <TopSubcategories categories={categories} categoryImages={categoryImages} go={go} />
 
-      <div className="container section">
+      <div className="container section" style={{paddingTop:20}}>
         <div className="section-head">
           <div>
             <span className="eyebrow">Curated</span>
@@ -1867,9 +1931,19 @@ function ProductForm({ initial, categories, onSave, onCancel }){
 }
 
 /* ---------------- Admin: Dashboard ---------------- */
-function CategoryManager({ categories, refreshCategories, fireToast }){
+function CategoryManager({ categories, categoryImages, refreshCategories, fireToast }){
   const [newCat, setNewCat] = useState('');
+  const [newCatImage, setNewCatImage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editingCat, setEditingCat] = useState(null);
+  const newFileRef = useRef(null);
+  const editFileRef = useRef(null);
+
+  const readAsDataUrl = (file, cb) => {
+    const reader = new FileReader();
+    reader.onload = (e) => cb(e.target.result);
+    reader.readAsDataURL(file);
+  };
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -1881,9 +1955,9 @@ function CategoryManager({ categories, refreshCategories, fireToast }){
     }
     setSaving(true);
     try{
-      await insertCategory(name);
+      await insertCategory(name, newCatImage || null);
       await refreshCategories();
-      setNewCat('');
+      setNewCat(''); setNewCatImage('');
       fireToast('Category added');
     }catch(e){
       fireToast('Error adding category');
@@ -1902,26 +1976,62 @@ function CategoryManager({ categories, refreshCategories, fireToast }){
     }
   };
 
+  const handleImageChange = (name, file) => {
+    readAsDataUrl(file, async (dataUrl) => {
+      try{
+        await updateCategoryImage(name, dataUrl);
+        await refreshCategories();
+        fireToast('Category image updated');
+      }catch(e){
+        fireToast('Error updating image');
+      }
+    });
+  };
+
   return (
     <div className="admin-panel-box">
       <h3 className="serif">Manage Categories</h3>
-      <form onSubmit={handleAdd} style={{display:'flex', gap:10, marginBottom:20}}>
-        <input value={newCat} onChange={e=>setNewCat(e.target.value)} placeholder="e.g. Abayas, Dupattas, Fashion Accessories" style={{flex:1, background:'rgba(42,39,36,0.03)', border:'1px solid var(--line)', color:'var(--ivory)', padding:'12px 14px', fontSize:14}} />
+      <form onSubmit={handleAdd} style={{display:'flex', gap:10, marginBottom:26, flexWrap:'wrap', alignItems:'center'}}>
+        <input value={newCat} onChange={e=>setNewCat(e.target.value)} placeholder="e.g. Abayas, Dupattas, Fashion Accessories" style={{flex:1, minWidth:180, background:'rgba(42,39,36,0.03)', border:'1px solid var(--line)', color:'var(--ivory)', padding:'12px 14px', fontSize:14}} />
+        <button type="button" className="btn btn-outline" onClick={()=>newFileRef.current.click()}>
+          {newCatImage ? 'Image Selected ✓' : 'Add Image (Optional)'}
+        </button>
+        <input ref={newFileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{ if(e.target.files[0]) readAsDataUrl(e.target.files[0], setNewCatImage); }} />
         <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Adding…' : 'Add'}</button>
       </form>
-      <div style={{display:'flex', flexWrap:'wrap', gap:10}}>
+
+      <p style={{fontSize:11, color:'var(--sand-dim)', marginBottom:14}}>Tap a category's thumbnail below to change its image. These images appear in the "Top Categories" row on your homepage.</p>
+
+      <div style={{display:'flex', flexWrap:'wrap', gap:18}}>
         {categories.map(cat=>(
-          <span key={cat} style={{display:'inline-flex', alignItems:'center', gap:8, border:'1px solid var(--line)', padding:'7px 8px 7px 14px', fontSize:13}}>
-            {cat}
-            <button onClick={()=>handleDelete(cat)} style={{color:'var(--maroon)', fontSize:14, padding:'2px 6px'}} aria-label={`Delete ${cat}`}>✕</button>
-          </span>
+          <div key={cat} style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, width:92}}>
+            <div
+              style={{position:'relative', width:76, height:76, borderRadius:6, overflow:'hidden', background:'var(--sand)', cursor:'pointer', border:'1px solid var(--line)'}}
+              onClick={()=>{ setEditingCat(cat); editFileRef.current.click(); }}
+              title="Tap to change image"
+            >
+              <img src={(categoryImages && categoryImages[cat]) || placeholderImg(cat,152,152)} style={{width:'100%', height:'100%', objectFit:'cover'}} />
+            </div>
+            <span style={{fontSize:11.5, textAlign:'center', lineHeight:1.3}}>{cat}</span>
+            <button onClick={()=>handleDelete(cat)} style={{color:'var(--maroon-light)', fontSize:11, textTransform:'uppercase', letterSpacing:'0.04em'}} aria-label={`Delete ${cat}`}>Remove</button>
+          </div>
         ))}
       </div>
+      <input
+        ref={editFileRef}
+        type="file"
+        accept="image/*"
+        style={{display:'none'}}
+        onChange={e=>{
+          if(e.target.files[0] && editingCat) handleImageChange(editingCat, e.target.files[0]);
+          e.target.value = '';
+        }}
+      />
     </div>
   );
 }
 
-function AdminDashboard({ products, setProducts, fireToast, onLogout, categories, refreshCategories }){
+function AdminDashboard({ products, setProducts, fireToast, onLogout, categories, refreshCategories, categoryImages }){
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
@@ -1980,7 +2090,7 @@ function AdminDashboard({ products, setProducts, fireToast, onLogout, categories
           <div className="stat-box"><div className="num serif">Rs. {totalValue.toLocaleString()}</div><div className="lbl">Catalog Value</div></div>
         </div>
 
-        <CategoryManager categories={categories} refreshCategories={refreshCategories} fireToast={fireToast} />
+        <CategoryManager categories={categories} categoryImages={categoryImages} refreshCategories={refreshCategories} fireToast={fireToast} />
 
         {showForm ? (
           <ProductForm
@@ -2027,7 +2137,7 @@ function AdminDashboard({ products, setProducts, fireToast, onLogout, categories
   );
 }
 
-function Admin({ products, setProducts, fireToast, categories, refreshCategories }){
+function Admin({ products, setProducts, fireToast, categories, refreshCategories, categoryImages }){
   const [authed, setAuthed] = useState(false);
   const [checking, setChecking] = useState(true);
 
@@ -2058,7 +2168,7 @@ function Admin({ products, setProducts, fireToast, categories, refreshCategories
   }
 
   if(!authed) return <AdminLogin onSuccess={()=>setAuthed(true)} />;
-  return <AdminDashboard products={products} setProducts={setProducts} fireToast={fireToast} onLogout={handleLogout} categories={categories} refreshCategories={refreshCategories} />;
+  return <AdminDashboard products={products} setProducts={setProducts} fireToast={fireToast} onLogout={handleLogout} categories={categories} refreshCategories={refreshCategories} categoryImages={categoryImages} />;
 }
 
 /* ---------------- Footer ---------------- */
@@ -2199,6 +2309,7 @@ function App(){
   const [params, setParams] = useState({});
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [categoryImages, setCategoryImages] = useState({});
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -2207,16 +2318,18 @@ function App(){
   const [fireToast, toastNode] = useToast();
 
   const refreshCategories = async () => {
-    const cats = await loadCategories();
+    const [cats, imgs] = await Promise.all([loadCategories(), loadCategoryImages()]);
     if(cats.length) setCategories(cats);
+    setCategoryImages(imgs);
   };
 
   useEffect(()=>{
     (async ()=>{
-      const [result, sess, cats] = await Promise.all([loadProducts(), getCurrentSession(), loadCategories()]);
+      const [result, sess, cats, imgs] = await Promise.all([loadProducts(), getCurrentSession(), loadCategories(), loadCategoryImages()]);
       setProducts(result.data);
       if(result.error) setLoadError(result.error);
       if(cats.length) setCategories(cats);
+      setCategoryImages(imgs);
       setSession(sess);
       const c = await loadCart(sess ? sess.user.id : null);
       setCart(c);
@@ -2318,7 +2431,7 @@ function App(){
             Couldn't load products: {loadError}. Check your internet connection or refresh the page.
           </div>
         )}
-        <Admin products={products} setProducts={setProducts} fireToast={fireToast} categories={categories} refreshCategories={refreshCategories} />
+        <Admin products={products} setProducts={setProducts} fireToast={fireToast} categories={categories} refreshCategories={refreshCategories} categoryImages={categoryImages} />
         {toastNode}
       </div>
     );
@@ -2345,7 +2458,7 @@ function App(){
       )}
       <AnnounceBar />
       <Nav route={route} go={go} cartCount={cartCount} openCart={()=>setCartOpen(true)} session={session} categories={categories} />
-      {route==='home' && <Home products={products} go={go} onQuickAdd={quickAdd} />}
+      {route==='home' && <Home products={products} go={go} onQuickAdd={quickAdd} categories={categories} categoryImages={categoryImages} />}
       {route==='shop' && <Shop products={products} params={params} go={go} onQuickAdd={quickAdd} categories={categories} />}
       {route==='product' && <ProductDetail products={products} params={params} go={go} onAddToCart={addToCart} session={session} />}
       {route==='info' && <InfoPage pageKey={params.page} go={go} />}
