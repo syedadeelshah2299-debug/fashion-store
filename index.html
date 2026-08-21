@@ -356,6 +356,9 @@
   .pd-info h1{ font-size:clamp(28px,4vw,42px); margin-bottom:14px; }
   .pd-price{ font-size:22px; color:var(--brass); font-weight:600; margin-bottom:24px; }
   .pd-desc{ color:var(--sand-dim); line-height:1.8; font-size:14.5px; margin-bottom:30px; max-width:480px; }
+  .pd-desc-list{ color:var(--sand-dim); line-height:1.7; font-size:14px; max-width:480px; list-style:none; padding:0; }
+  .pd-desc-list li{ position:relative; padding-left:18px; margin-bottom:10px; }
+  .pd-desc-list li::before{ content:'•'; position:absolute; left:0; color:var(--brass); }
   .pd-meta-row{ display:flex; gap:30px; margin-bottom:30px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:20px 0; }
   .pd-meta-row div span{ display:block; }
   .pd-meta-row .k{ font-size:10px; text-transform:uppercase; letter-spacing:0.1em; color:var(--sand-dim); margin-bottom:6px; }
@@ -2541,6 +2544,23 @@ function ReviewsSection({
     onClick: () => handleDelete(r.id)
   }, "Delete"))))));
 }
+function DescriptionList({ text }) {
+  if (!text) return null;
+  // Split on bullet character; also handle plain newlines as a fallback
+  var parts = text.split('•').map(function(s) { return s.trim(); }).filter(Boolean);
+  if (parts.length <= 1) {
+    parts = text.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
+  }
+  if (parts.length <= 1) {
+    return /*#__PURE__*/React.createElement("p", { className: "pd-desc", style: { marginTop: 24 } }, text);
+  }
+  return /*#__PURE__*/React.createElement("ul", { className: "pd-desc-list", style: { marginTop: 24, marginBottom: 30 } },
+    parts.map(function(line, i) {
+      return /*#__PURE__*/React.createElement("li", { key: i }, line);
+    })
+  );
+}
+
 function ProductDetail({
   products,
   params,
@@ -2650,12 +2670,9 @@ function ProductDetail({
     style: {
       position: 'static'
     }
-  }, "Sale"))), /*#__PURE__*/React.createElement("p", {
-    className: "pd-desc",
-    style: {
-      marginTop: 24
-    }
-  }, p.desc), /*#__PURE__*/React.createElement(SizeChart, {
+  }, "Sale"))), /*#__PURE__*/React.createElement(DescriptionList, {
+    text: p.desc
+  }), /*#__PURE__*/React.createElement(SizeChart, {
     category: p.category
   }), /*#__PURE__*/React.createElement("div", {
     className: "pd-meta-row"
