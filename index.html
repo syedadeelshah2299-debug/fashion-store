@@ -80,6 +80,9 @@
   .brand-sub{ font-size:9px; letter-spacing:0.28em; color:var(--brass); text-transform:uppercase; margin-top:4px; }
   .nav-links{ display:flex; gap:36px; align-items:center; }
   .nav-item{ position:relative; }
+  .nav-item::after{
+    content:''; position:absolute; left:0; right:0; top:100%; height:18px;
+  }
   .nav-item > a, .nav-item > button{ font-size:13px; letter-spacing:0.04em; color:var(--sand-dim); transition:color .25s; position:relative; display:inline-flex; align-items:center; gap:4px; }
   .nav-item:hover > a, .nav-item:hover > button{ color:var(--ivory); }
   .nav-links a{ font-size:13px; letter-spacing:0.04em; color:var(--sand-dim); transition:color .25s; position:relative; }
@@ -816,6 +819,11 @@ function dataUrlToBlob(dataUrl) {
   });
 }
 
+/* Wraps a promise so it never hangs forever — used during migration so one slow/stuck image can't block the rest */
+function withTimeout(promise, ms, label) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), ms))]);
+}
+
 /* ---------------- Storage helpers (Supabase-backed) ---------------- */
 async function loadProducts() {
   if (!supabaseClient) return {
@@ -1209,6 +1217,18 @@ function Nav({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState(null);
+  const [openCat, setOpenCat] = useState(null);
+  const closeTimerRef = useRef(null);
+  const openMenu = cat => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setOpenCat(cat);
+  };
+  const scheduleClose = () => {
+    closeTimerRef.current = setTimeout(() => setOpenCat(null), 300);
+  };
   const navigate = (cat, sub) => {
     go('shop', {
       cat,
@@ -1244,7 +1264,9 @@ function Nav({
     href: "#"
   }, "Shop All")), categories.map(cat => /*#__PURE__*/React.createElement("div", {
     className: "nav-item",
-    key: cat
+    key: cat,
+    onMouseEnter: () => openMenu(cat),
+    onMouseLeave: scheduleClose
   }, /*#__PURE__*/React.createElement("a", {
     href: "#",
     onClick: e => {
@@ -1254,7 +1276,10 @@ function Nav({
   }, cat, " ", /*#__PURE__*/React.createElement("span", {
     className: "mega-caret"
   }, "▾")), /*#__PURE__*/React.createElement("div", {
-    className: "mega-panel"
+    className: "mega-panel",
+    style: {
+      display: openCat === cat ? 'flex' : 'none'
+    }
   }, /*#__PURE__*/React.createElement("a", {
     href: "#",
     className: "mega-all",
@@ -3467,7 +3492,7 @@ function ImageMigrationPanel({
           for (const img of p.images) {
             if (typeof img === 'string' && img.startsWith('data:')) {
               const blob = dataUrlToBlob(img);
-              const url = await uploadImageToBucket(blob);
+              const url = await withTimeout(uploadImageToBucket(blob), 20000, 'Image upload');
               newImages.push(url);
               done++;
               setProgress(`Migrated ${done}/${pendingCount} images…`);
@@ -3475,10 +3500,10 @@ function ImageMigrationPanel({
               newImages.push(img);
             }
           }
-          const saved = await updateProductRow(p.id, {
+          const saved = await withTimeout(updateProductRow(p.id, {
             ...p,
             images: newImages
-          });
+          }), 20000, 'Product save');
           if (saved) {
             setProducts(prev => prev.map(x => x.id === p.id ? saved : x));
           }
@@ -3492,8 +3517,8 @@ function ImageMigrationPanel({
           setProgress(`Migrating category: ${cat}`);
           try {
             const blob = dataUrlToBlob(img);
-            const url = await uploadImageToBucket(blob);
-            await updateCategoryImage(cat, url);
+            const url = await withTimeout(uploadImageToBucket(blob), 20000, 'Image upload');
+            await withTimeout(updateCategoryImage(cat, url), 20000, 'Category save');
             await refreshCategories();
             done++;
             setProgress(`Migrated ${done}/${pendingCount} images…`);
