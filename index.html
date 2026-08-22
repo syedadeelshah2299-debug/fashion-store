@@ -345,7 +345,7 @@
   .footer ul a:hover{ color:var(--ivory); }
   .footer-bottom{ display:flex; justify-content:space-between; padding-top:24px; border-top:1px solid var(--line); font-size:12px; color:var(--sand-dim); flex-wrap:wrap; gap:10px; }
 
-    /* ---------- Product detail ---------- */
+  /* ---------- Product detail ---------- */
   .pd-wrap{ display:grid; grid-template-columns:1fr 1fr; gap:60px; padding:60px 0 100px; }
   @media (max-width:860px){ .pd-wrap{ grid-template-columns:1fr; gap:32px; padding-top:30px; } }
   .pd-media{
@@ -695,7 +695,7 @@ const SEED_PRODUCTS = [{
   price: 3600,
   desc: 'Minimal straight-cut kurta in brushed charcoal cotton. Designed as a wardrobe staple that pairs with anything.',
   fabric: 'Brushed Cotton',
-    images: [placeholderImg('rumi1'), placeholderImg('rumi2')],
+  images: [placeholderImg('rumi1'), placeholderImg('rumi2')],
   rating: 5,
   featured: true
 }, {
@@ -1036,8 +1036,8 @@ async function customerSignUp(email, password) {
   });
   if (error) throw error;
   return data;
-  }
-  async function customerSignIn(email, password) {
+}
+async function customerSignIn(email, password) {
   if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
   const {
     data,
@@ -1387,7 +1387,7 @@ function Hero({
       id: featuredProduct.id
     }),
     style: {
-        cursor: 'pointer'
+      cursor: 'pointer'
     }
   }, /*#__PURE__*/React.createElement("img", {
     src: featuredProduct.images[0],
@@ -1722,8 +1722,8 @@ function TopSubcategories({
       className: "subcat-label"
     }, cat));
   })));
-  }
-  function Home({
+}
+function Home({
   products,
   go,
   onQuickAdd,
@@ -2070,8 +2070,8 @@ function AccountProfile({
       fireToast('Review deleted');
     } catch (e) {
       fireToast('Could not delete review');
-                                                                              }
-    };
+    }
+  };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "account-panel",
     style: {
@@ -2418,7 +2418,7 @@ function ReviewForm({
     } catch (e) {
       setErr("Couldn't submit review — try again.");
     }
-        setSubmitting(false);
+    setSubmitting(false);
   };
   return /*#__PURE__*/React.createElement("form", {
     className: "review-form",
@@ -2768,7 +2768,7 @@ function CartDrawer({
     className: "ci-meta"
   }, x.product.category), /*#__PURE__*/React.createElement("div", {
     className: "ci-row"
-    }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
     className: "qty-box"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => updateQty(x.id, Math.max(1, x.qty - 1))
@@ -3114,8 +3114,8 @@ function CategoryManager({
       fireToast('Category deleted');
     } catch (e) {
       fireToast('Error deleting category');
-                                      }
-    };
+    }
+  };
   const handleImageChange = (name, file) => {
     readAsDataUrl(file, async dataUrl => {
       try {
@@ -3447,7 +3447,7 @@ function AdminDashboard({
     style: {
       marginBottom: 30
     }
-    }, "+ Add New Product"), /*#__PURE__*/React.createElement("div", {
+  }, "+ Add New Product"), /*#__PURE__*/React.createElement("div", {
     className: "admin-panel-box"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "serif"
@@ -3798,7 +3798,7 @@ function App() {
       if (result.error) setLoadError(result.error);
       setLoading(false);
 
-        // Background: categories, session, cart — none of these should delay first paint
+      // Background: categories, session, cart — none of these should delay first paint
       const [sess, cats, imgs] = await Promise.all([getCurrentSession(), loadCategories(), loadCategoryImages()]);
       if (cats.length) setCategories(cats);
       setCategoryImages(imgs);
