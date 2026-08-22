@@ -8,7 +8,7 @@
 <meta property="og:title" content="Noor & Weave — Premium Pakistani Fashion" />
 <meta property="og:description" content="Hand-finished suits and kurtas built for Pakistani mornings. Shop lawns, formals, and everyday wear with Cash on Delivery." />
 <meta property="og:type" content="website" />
-<meta name="theme-color" content="#15130F" />
+<meta name="theme-color" content="#FBF9F6" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%2315130F'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='%23B08D57' font-family='Georgia,serif'%3EN%3C/text%3E%3C/svg%3E" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -345,7 +345,7 @@
   .footer ul a:hover{ color:var(--ivory); }
   .footer-bottom{ display:flex; justify-content:space-between; padding-top:24px; border-top:1px solid var(--line); font-size:12px; color:var(--sand-dim); flex-wrap:wrap; gap:10px; }
 
-  /* ---------- Product detail ---------- */
+    /* ---------- Product detail ---------- */
   .pd-wrap{ display:grid; grid-template-columns:1fr 1fr; gap:60px; padding:60px 0 100px; }
   @media (max-width:860px){ .pd-wrap{ grid-template-columns:1fr; gap:32px; padding-top:30px; } }
   .pd-media{
@@ -695,7 +695,7 @@ const SEED_PRODUCTS = [{
   price: 3600,
   desc: 'Minimal straight-cut kurta in brushed charcoal cotton. Designed as a wardrobe staple that pairs with anything.',
   fabric: 'Brushed Cotton',
-  images: [placeholderImg('rumi1'), placeholderImg('rumi2')],
+    images: [placeholderImg('rumi1'), placeholderImg('rumi2')],
   rating: 5,
   featured: true
 }, {
@@ -780,12 +780,14 @@ async function loadProducts() {
     data: []
   };
   try {
+    const queryPromise = supabaseClient.from('products').select('*').order('id', {
+      ascending: false
+    });
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out — please refresh')), 8000));
     const {
       data,
       error
-    } = await supabaseClient.from('products').select('*').order('id', {
-      ascending: false
-    });
+    } = await Promise.race([queryPromise, timeoutPromise]);
     if (error) {
       console.error('Supabase load error:', error);
       return {
@@ -1034,8 +1036,8 @@ async function customerSignUp(email, password) {
   });
   if (error) throw error;
   return data;
-}
-async function customerSignIn(email, password) {
+  }
+  async function customerSignIn(email, password) {
   if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
   const {
     data,
@@ -1385,7 +1387,7 @@ function Hero({
       id: featuredProduct.id
     }),
     style: {
-      cursor: 'pointer'
+        cursor: 'pointer'
     }
   }, /*#__PURE__*/React.createElement("img", {
     src: featuredProduct.images[0],
@@ -1720,8 +1722,8 @@ function TopSubcategories({
       className: "subcat-label"
     }, cat));
   })));
-}
-function Home({
+  }
+  function Home({
   products,
   go,
   onQuickAdd,
@@ -2068,8 +2070,8 @@ function AccountProfile({
       fireToast('Review deleted');
     } catch (e) {
       fireToast('Could not delete review');
-    }
-  };
+                                                                              }
+    };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "account-panel",
     style: {
@@ -2416,7 +2418,7 @@ function ReviewForm({
     } catch (e) {
       setErr("Couldn't submit review — try again.");
     }
-    setSubmitting(false);
+        setSubmitting(false);
   };
   return /*#__PURE__*/React.createElement("form", {
     className: "review-form",
@@ -2766,7 +2768,7 @@ function CartDrawer({
     className: "ci-meta"
   }, x.product.category), /*#__PURE__*/React.createElement("div", {
     className: "ci-row"
-  }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("div", {
     className: "qty-box"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => updateQty(x.id, Math.max(1, x.qty - 1))
@@ -3112,8 +3114,8 @@ function CategoryManager({
       fireToast('Category deleted');
     } catch (e) {
       fireToast('Error deleting category');
-    }
-  };
+                                      }
+    };
   const handleImageChange = (name, file) => {
     readAsDataUrl(file, async dataUrl => {
       try {
@@ -3445,7 +3447,7 @@ function AdminDashboard({
     style: {
       marginBottom: 30
     }
-  }, "+ Add New Product"), /*#__PURE__*/React.createElement("div", {
+    }, "+ Add New Product"), /*#__PURE__*/React.createElement("div", {
     className: "admin-panel-box"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "serif"
@@ -3790,15 +3792,19 @@ function App() {
   };
   useEffect(() => {
     (async () => {
-      const [result, sess, cats, imgs] = await Promise.all([loadProducts(), getCurrentSession(), loadCategories(), loadCategoryImages()]);
+      // Only block the UI on products loading — everything else loads in the background
+      const result = await loadProducts();
       setProducts(result.data);
       if (result.error) setLoadError(result.error);
+      setLoading(false);
+
+        // Background: categories, session, cart — none of these should delay first paint
+      const [sess, cats, imgs] = await Promise.all([getCurrentSession(), loadCategories(), loadCategoryImages()]);
       if (cats.length) setCategories(cats);
       setCategoryImages(imgs);
       setSession(sess);
       const c = await loadCart(sess ? sess.user.id : null);
       setCart(c);
-      setLoading(false);
     })();
     if (supabaseClient) {
       const {
