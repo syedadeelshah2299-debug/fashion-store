@@ -379,10 +379,16 @@
     display:flex; align-items:center; gap:8px; font-size:12.5px; letter-spacing:0.04em; text-transform:uppercase;
     color:var(--brass); border-bottom:1px solid var(--brass); padding-bottom:3px; margin-bottom:20px; width:fit-content;
   }
-  .size-chart-table{ width:100%; border-collapse:collapse; margin-bottom:26px; font-size:13px; }
-  .size-chart-table th, .size-chart-table td{ border:1px solid var(--line); padding:10px 12px; text-align:center; }
+  .size-chart-scroll{ overflow-x:auto; margin-bottom:26px; -webkit-overflow-scrolling:touch; }
+  .size-chart-table{ width:100%; min-width:480px; border-collapse:collapse; font-size:13px; }
+  .size-chart-table th, .size-chart-table td{ border:1px solid var(--line); padding:10px 12px; text-align:center; white-space:nowrap; }
   .size-chart-table th{ background:rgba(176,141,87,0.08); color:var(--brass); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; }
   .size-chart-table td:first-child, .size-chart-table th:first-child{ text-align:left; color:var(--sand-dim); }
+  @media (max-width:560px){
+    .size-chart-table{ min-width:420px; font-size:11.5px; }
+    .size-chart-table th, .size-chart-table td{ padding:8px 8px; }
+    .size-chart-table th{ font-size:9.5px; }
+  }
 
   /* ---------- Reviews ---------- */
   .reviews-section{ margin-top:60px; border-top:1px solid var(--line); padding-top:40px; }
@@ -2512,11 +2518,13 @@ function SizeChart({
   }, /*#__PURE__*/React.createElement("button", {
     className: "size-chart-toggle",
     onClick: () => setOpen(v => !v)
-  }, open ? 'Hide' : 'View', " Size Chart ", open ? '▲' : '▼'), open && /*#__PURE__*/React.createElement("table", {
+  }, open ? 'Hide' : 'View', " Size Chart ", open ? '▲' : '▼'), open && /*#__PURE__*/React.createElement("div", {
+    className: "size-chart-scroll"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "size-chart-table"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Size"), /*#__PURE__*/React.createElement("th", null, "Chest"), /*#__PURE__*/React.createElement("th", null, "Waist"), /*#__PURE__*/React.createElement("th", null, "Shoulder"), /*#__PURE__*/React.createElement("th", null, "Length"), /*#__PURE__*/React.createElement("th", null, "Sleeve"))), /*#__PURE__*/React.createElement("tbody", null, SIZE_CHART_DATA.map((row, i) => /*#__PURE__*/React.createElement("tr", {
     key: i
-  }, /*#__PURE__*/React.createElement("td", null, row.size), /*#__PURE__*/React.createElement("td", null, row.chest), /*#__PURE__*/React.createElement("td", null, row.waist), /*#__PURE__*/React.createElement("td", null, row.shoulder), /*#__PURE__*/React.createElement("td", null, row.length), /*#__PURE__*/React.createElement("td", null, row.sleeve))))));
+  }, /*#__PURE__*/React.createElement("td", null, row.size), /*#__PURE__*/React.createElement("td", null, row.chest), /*#__PURE__*/React.createElement("td", null, row.waist), /*#__PURE__*/React.createElement("td", null, row.shoulder), /*#__PURE__*/React.createElement("td", null, row.length), /*#__PURE__*/React.createElement("td", null, row.sleeve)))))));
 }
 
 /* ---------------- Reviews ---------------- */
@@ -3676,15 +3684,27 @@ function AdminOrders({
   }, "Cancelled")))))))));
 }
 /* ---------------- Image Migration (moves old base64 images to Storage bucket) ---------------- */
+/* The OLD project's storage domain — any image still hosted here needs moving before that project can be deleted */
+const OLD_PROJECT_HOST = 'qkysezjkclpclkmrnops.supabase.co';
+function needsImageMigration(img) {
+  if (typeof img !== 'string') return false;
+  return img.startsWith('data:') || img.includes(OLD_PROJECT_HOST);
+}
+async function getBlobForImage(img) {
+  if (img.startsWith('data:')) return dataUrlToBlob(img);
+  const res = await fetch(img);
+  if (!res.ok) throw new Error('Failed to fetch image: ' + res.status);
+  return await res.blob();
+}
 function countBase64Images(products, categoryImages) {
   let count = 0;
   products.forEach(p => {
     (p.images || []).forEach(img => {
-      if (typeof img === 'string' && img.startsWith('data:')) count++;
+      if (needsImageMigration(img)) count++;
     });
   });
   Object.values(categoryImages || {}).forEach(img => {
-    if (typeof img === 'string' && img.startsWith('data:')) count++;
+    if (needsImageMigration(img)) count++;
   });
   return count;
 }
@@ -3701,19 +3721,19 @@ function ImageMigrationPanel({
   const pendingCount = countBase64Images(products, categoryImages);
   if (pendingCount === 0) return null;
   const runMigration = async () => {
-    if (!window.confirm(`This will move ${pendingCount} old image(s) into faster storage. Your products and categories will stay the same — only the image links get updated. Continue?`)) return;
+    if (!window.confirm(`This will move ${pendingCount} old image(s) into your current storage. Your products and categories will stay the same — only the image links get updated. Continue?`)) return;
     setMigrating(true);
     let done = 0;
     try {
       for (const p of products) {
-        const hasOld = (p.images || []).some(img => typeof img === 'string' && img.startsWith('data:'));
+        const hasOld = (p.images || []).some(img => needsImageMigration(img));
         if (!hasOld) continue;
         setProgress(`Migrating product: ${p.name}`);
         try {
           const newImages = [];
           for (const img of p.images) {
-            if (typeof img === 'string' && img.startsWith('data:')) {
-              const blob = dataUrlToBlob(img);
+            if (needsImageMigration(img)) {
+              const blob = await withTimeout(getBlobForImage(img), 20000, 'Image fetch');
               const url = await withTimeout(uploadImageToBucket(blob), 20000, 'Image upload');
               newImages.push(url);
               done++;
@@ -3735,10 +3755,10 @@ function ImageMigrationPanel({
       }
       for (const cat of categories) {
         const img = categoryImages && categoryImages[cat];
-        if (typeof img === 'string' && img.startsWith('data:')) {
+        if (needsImageMigration(img)) {
           setProgress(`Migrating category: ${cat}`);
           try {
-            const blob = dataUrlToBlob(img);
+            const blob = await withTimeout(getBlobForImage(img), 20000, 'Image fetch');
             const url = await withTimeout(uploadImageToBucket(blob), 20000, 'Image upload');
             await withTimeout(updateCategoryImage(cat, url), 20000, 'Category save');
             await refreshCategories();
@@ -3770,7 +3790,7 @@ function ImageMigrationPanel({
       marginBottom: 16,
       maxWidth: 560
     }
-  }, `${pendingCount} old image(s) are still stored the slow way and may be making your site feel heavy on first load. Click below to move them into fast storage — nothing will be deleted, only the image links get updated.`), /*#__PURE__*/React.createElement("button", {
+  }, `${pendingCount} image(s) are still stored the old way (or on an old project's storage) and may be making your site feel heavy or unsafe to clean up. Click below to move them into your current storage — nothing will be deleted, only the image links get updated.`), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary",
     onClick: runMigration,
     disabled: migrating
