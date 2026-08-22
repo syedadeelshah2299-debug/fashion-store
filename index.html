@@ -777,7 +777,12 @@ function productToRow(p) {
 const IMAGE_BUCKET = 'Product-images';
 async function uploadImageToBucket(file) {
   if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
-  const ext = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : 'jpg';
+  let ext = 'jpg';
+  if (file.name && file.name.includes('.')) {
+    ext = file.name.split('.').pop();
+  } else if (file.type && file.type.includes('/')) {
+    ext = file.type.split('/').pop().replace('jpeg', 'jpg');
+  }
   const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   const {
     error
@@ -793,6 +798,22 @@ async function uploadImageToBucket(file) {
     data
   } = supabaseClient.storage.from(IMAGE_BUCKET).getPublicUrl(path);
   return data.publicUrl;
+}
+
+/* Converts a base64 data URL (old-style stored image) into a Blob for re-upload */
+function dataUrlToBlob(dataUrl) {
+  const parts = dataUrl.split(',');
+  const mimeMatch = parts[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const binary = atob(parts[1]);
+  let n = binary.length;
+  const bytes = new Uint8Array(n);
+  while (n--) {
+    bytes[n] = binary.charCodeAt(n);
+  }
+  return new Blob([bytes], {
+    type: mime
+  });
 }
 
 /* ---------------- Storage helpers (Supabase-backed) ---------------- */
@@ -3407,6 +3428,113 @@ function AdminOrders({
     value: "cancelled"
   }, "Cancelled")))))))));
 }
+/* ---------------- Image Migration (moves old base64 images to Storage bucket) ---------------- */
+function countBase64Images(products, categoryImages) {
+  let count = 0;
+  products.forEach(p => {
+    (p.images || []).forEach(img => {
+      if (typeof img === 'string' && img.startsWith('data:')) count++;
+    });
+  });
+  Object.values(categoryImages || {}).forEach(img => {
+    if (typeof img === 'string' && img.startsWith('data:')) count++;
+  });
+  return count;
+}
+function ImageMigrationPanel({
+  products,
+  setProducts,
+  categories,
+  categoryImages,
+  refreshCategories,
+  fireToast
+}) {
+  const [migrating, setMigrating] = useState(false);
+  const [progress, setProgress] = useState('');
+  const pendingCount = countBase64Images(products, categoryImages);
+  if (pendingCount === 0) return null;
+  const runMigration = async () => {
+    if (!window.confirm(`This will move ${pendingCount} old image(s) into faster storage. Your products and categories will stay the same — only the image links get updated. Continue?`)) return;
+    setMigrating(true);
+    let done = 0;
+    try {
+      for (const p of products) {
+        const hasOld = (p.images || []).some(img => typeof img === 'string' && img.startsWith('data:'));
+        if (!hasOld) continue;
+        setProgress(`Migrating product: ${p.name}`);
+        try {
+          const newImages = [];
+          for (const img of p.images) {
+            if (typeof img === 'string' && img.startsWith('data:')) {
+              const blob = dataUrlToBlob(img);
+              const url = await uploadImageToBucket(blob);
+              newImages.push(url);
+              done++;
+              setProgress(`Migrated ${done}/${pendingCount} images…`);
+            } else {
+              newImages.push(img);
+            }
+          }
+          const saved = await updateProductRow(p.id, {
+            ...p,
+            images: newImages
+          });
+          if (saved) {
+            setProducts(prev => prev.map(x => x.id === p.id ? saved : x));
+          }
+        } catch (e) {
+          console.error('Migration failed for product', p.id, e);
+        }
+      }
+      for (const cat of categories) {
+        const img = categoryImages && categoryImages[cat];
+        if (typeof img === 'string' && img.startsWith('data:')) {
+          setProgress(`Migrating category: ${cat}`);
+          try {
+            const blob = dataUrlToBlob(img);
+            const url = await uploadImageToBucket(blob);
+            await updateCategoryImage(cat, url);
+            await refreshCategories();
+            done++;
+            setProgress(`Migrated ${done}/${pendingCount} images…`);
+          } catch (e) {
+            console.error('Migration failed for category', cat, e);
+          }
+        }
+      }
+      fireToast('Image migration complete');
+    } catch (e) {
+      fireToast('Migration stopped due to an error — check console');
+    }
+    setProgress('');
+    setMigrating(false);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-panel-box",
+    style: {
+      borderColor: 'var(--brass)'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "serif"
+  }, "Speed Up Old Images"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: 'var(--sand-dim)',
+      marginBottom: 16,
+      maxWidth: 560
+    }
+  }, `${pendingCount} old image(s) are still stored the slow way and may be making your site feel heavy on first load. Click below to move them into fast storage — nothing will be deleted, only the image links get updated.`), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: runMigration,
+    disabled: migrating
+  }, migrating ? 'Migrating…' : `Migrate ${pendingCount} Image(s) to Storage`), migrating && progress && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: 'var(--sand-dim)',
+      marginTop: 12
+    }
+  }, progress));
+}
 function AdminDashboard({
   products,
   setProducts,
@@ -3505,7 +3633,14 @@ function AdminDashboard({
     className: "num serif"
   }, "Rs. ", totalValue.toLocaleString()), /*#__PURE__*/React.createElement("div", {
     className: "lbl"
-  }, "Catalog Value"))), /*#__PURE__*/React.createElement(AdminOrders, {
+  }, "Catalog Value"))), /*#__PURE__*/React.createElement(ImageMigrationPanel, {
+    products: products,
+    setProducts: setProducts,
+    categories: categories,
+    categoryImages: categoryImages,
+    refreshCategories: refreshCategories,
+    fireToast: fireToast
+  }), /*#__PURE__*/React.createElement(AdminOrders, {
     fireToast: fireToast
   }), /*#__PURE__*/React.createElement(CategoryManager, {
     categories: categories,
