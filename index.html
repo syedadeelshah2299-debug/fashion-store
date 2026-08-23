@@ -554,6 +554,17 @@
     .subcat-media{ border-radius:7px; }
     .subcat-label{ font-size:12px; margin-top:9px; line-height:1.3; }
   }
+  /* Homepage "Top Categories" keeps the original smaller 4-per-row layout */
+  .top-cat-grid{ grid-template-columns:repeat(4, 1fr); gap:14px 10px; }
+  .top-cat-grid .subcat-card{ padding:7px 6px 10px; }
+  .top-cat-grid .subcat-label{ font-size:10.5px; margin-top:7px; line-height:1.25; }
+  @media (max-width:700px){ .top-cat-grid{ grid-template-columns:repeat(4, 1fr); gap:10px 8px; } }
+  @media (max-width:560px){
+    .top-cat-grid{ grid-template-columns:repeat(4, 1fr); gap:8px 6px; }
+    .top-cat-grid .subcat-card{ border-radius:8px; padding:6px 5px 8px; }
+    .top-cat-grid .subcat-media{ border-radius:5px; }
+    .top-cat-grid .subcat-label{ font-size:9.5px; margin-top:6px; line-height:1.2; }
+  }
 </style>
 </head>
 <body>
@@ -2024,7 +2035,7 @@ function TopSubcategories({
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "eyebrow"
   }, "Explore"), /*#__PURE__*/React.createElement("h2", null, "Top Categories"))), /*#__PURE__*/React.createElement("div", {
-    className: "subcat-grid"
+    className: "subcat-grid top-cat-grid"
   }, categories.map(cat => {
     const img = categoryImages && categoryImages[cat] || placeholderImg(cat, 300, 300);
     return /*#__PURE__*/React.createElement("div", {
