@@ -326,13 +326,15 @@
   .empty-state h3{ color:var(--ivory); margin-bottom:10px; font-size:22px; }
 
   /* ---------- Filter bar ---------- */
-  .filter-bar{ display:flex; gap:10px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:16px; padding-bottom:6px; scrollbar-width:none; }
-  .filter-bar::-webkit-scrollbar{ display:none; }
+  .filter-bar{ display:flex; gap:8px 10px; flex-wrap:wrap; margin-bottom:16px; }
   .chip{
-    padding:9px 18px; border:1px solid var(--line); font-size:12px; letter-spacing:0.05em; text-transform:uppercase;
-    transition:all .2s; white-space:nowrap; flex-shrink:0;
+    padding:9px 16px; border:1px solid var(--line); font-size:12px; letter-spacing:0.05em; text-transform:uppercase;
+    transition:all .2s; white-space:nowrap;
   }
   .chip.active, .chip:hover{ border-color:var(--brass); color:var(--brass); }
+  @media (max-width:560px){
+    .chip{ padding:8px 13px; font-size:11px; letter-spacing:0.03em; }
+  }
   .search-bar-row{ margin-bottom:32px; }
   .search-input{
     width:100%; background:transparent; border:1px solid var(--line); color:var(--ivory);
