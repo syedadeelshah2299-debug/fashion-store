@@ -774,6 +774,14 @@ function rowToProduct(row) {
     showNewArrival: !!row.show_new_arrivals,
     showBestSeller: !!row.show_best_sellers,
     showCasualPick: !!row.show_casual_picks,
+    homepageSections: (function(){
+      if (Array.isArray(row.homepage_sections) && row.homepage_sections.length) return row.homepage_sections;
+      const legacy = [];
+      if (row.show_new_arrivals) legacy.push('new_arrivals');
+      if (row.show_best_sellers) legacy.push('best_sellers');
+      if (row.show_casual_picks) legacy.push('casual_kurtas');
+      return legacy;
+    })(),
     rating: row.rating || 4
   };
 }
@@ -789,9 +797,10 @@ function productToRow(p) {
     image_url: p.images && p.images[0] ? p.images[0] : null,
     image_urls: p.images && p.images.length ? p.images : [],
     featured: !!p.featured,
-    show_new_arrivals: !!p.showNewArrival,
-    show_best_sellers: !!p.showBestSeller,
-    show_casual_picks: !!p.showCasualPick,
+    show_new_arrivals: Array.isArray(p.homepageSections) ? p.homepageSections.includes('new_arrivals') : !!p.showNewArrival,
+    show_best_sellers: Array.isArray(p.homepageSections) ? p.homepageSections.includes('best_sellers') : !!p.showBestSeller,
+    show_casual_picks: Array.isArray(p.homepageSections) ? p.homepageSections.includes('casual_kurtas') : !!p.showCasualPick,
+    homepage_sections: Array.isArray(p.homepageSections) ? p.homepageSections : [],
     fabric: p.fabric || null,
     subcategory: p.subcategory || null,
     sizes: Array.isArray(p.sizes) ? p.sizes : [],
@@ -951,6 +960,75 @@ async function deleteCategory(name) {
   } = await supabaseClient.from('categories').delete().eq('name', name);
   if (error) {
     console.error('Supabase category delete error:', error);
+    throw error;
+  }
+}
+
+/* ---------------- Homepage Sections (customizable "Show on Homepage" tags) ---------------- */
+const DEFAULT_HOMEPAGE_SECTIONS = [{
+  id: 'default-new',
+  key: 'new_arrivals',
+  label: 'New Arrivals'
+}, {
+  id: 'default-best',
+  key: 'best_sellers',
+  label: 'Best Sellers'
+}, {
+  id: 'default-casual',
+  key: 'casual_kurtas',
+  label: 'Casual & Kurtas'
+}];
+function slugifySectionKey(label) {
+  const s = String(label).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return s || ('section_' + Date.now());
+}
+async function loadHomepageSections() {
+  if (!supabaseClient) return DEFAULT_HOMEPAGE_SECTIONS;
+  try {
+    const {
+      data,
+      error
+    } = await supabaseClient.from('homepage_sections').select('*').order('sort_order', {
+      ascending: true
+    });
+    if (error) {
+      console.error('Supabase homepage sections load error:', error);
+      return DEFAULT_HOMEPAGE_SECTIONS;
+    }
+    if (!data || data.length === 0) return DEFAULT_HOMEPAGE_SECTIONS;
+    return data.map(s => ({
+      id: s.id,
+      key: s.key,
+      label: s.label
+    }));
+  } catch (e) {
+    console.error('Supabase homepage sections load exception:', e);
+    return DEFAULT_HOMEPAGE_SECTIONS;
+  }
+}
+async function insertHomepageSection(label) {
+  if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const key = slugifySectionKey(label);
+  const {
+    data,
+    error
+  } = await supabaseClient.from('homepage_sections').insert([{
+    key,
+    label: label.trim()
+  }]).select();
+  if (error) {
+    console.error('Supabase homepage section insert error:', error);
+    throw error;
+  }
+  return data && data[0] ? data[0] : null;
+}
+async function deleteHomepageSection(id) {
+  if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const {
+    error
+  } = await supabaseClient.from('homepage_sections').delete().eq('id', id);
+  if (error) {
+    console.error('Supabase homepage section delete error:', error);
     throw error;
   }
 }
@@ -1892,15 +1970,13 @@ function Home({
   go,
   onQuickAdd,
   categories,
-  categoryImages
+  categoryImages,
+  homepageSections
 }) {
   const featured = products.filter(p => p.featured).slice(0, 4);
   const showcase = featured.length ? featured : products.slice(0, 4);
   const heroProduct = featured[0] || products[0] || null;
-  const newArrivals = useMemo(() => products.filter(p => p.showNewArrival), [products]);
   const saleItems = useMemo(() => products.filter(p => p.originalPrice && p.originalPrice > p.price).slice(0, 4), [products]);
-  const bestSellers = useMemo(() => products.filter(p => p.showBestSeller), [products]);
-  const rest = useMemo(() => products.filter(p => p.showCasualPick), [products]);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Hero, {
     go: go,
     featuredProduct: heroProduct
@@ -1935,32 +2011,37 @@ function Home({
     p: p,
     go: go,
     onQuickAdd: onQuickAdd
-  })))), newArrivals.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "container section",
-    style: {
-      paddingTop: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "section-head"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "eyebrow"
-  }, "Just In"), /*#__PURE__*/React.createElement("h2", null, "New Arrivals")), /*#__PURE__*/React.createElement("a", {
-    className: "view-all",
-    href: "#",
-    onClick: e => {
-      e.preventDefault();
-      go('shop', {
-        cat: 'all'
-      });
-    }
-  }, "View All →")), /*#__PURE__*/React.createElement("div", {
-    className: "grid"
-  }, newArrivals.map(p => /*#__PURE__*/React.createElement(ProductCard, {
-    key: p.id,
-    p: p,
-    go: go,
-    onQuickAdd: onQuickAdd
-  })))), saleItems.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })))), (homepageSections || []).map(sec => {
+    const items = products.filter(p => Array.isArray(p.homepageSections) && p.homepageSections.includes(sec.key));
+    if (items.length === 0) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "container section",
+      style: {
+        paddingTop: 0
+      },
+      key: sec.key
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "section-head"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      className: "eyebrow"
+    }, "Curated For You"), /*#__PURE__*/React.createElement("h2", null, sec.label)), /*#__PURE__*/React.createElement("a", {
+      className: "view-all",
+      href: "#",
+      onClick: e => {
+        e.preventDefault();
+        go('shop', {
+          cat: 'all'
+        });
+      }
+    }, "View All →")), /*#__PURE__*/React.createElement("div", {
+      className: "grid"
+    }, items.map(p => /*#__PURE__*/React.createElement(ProductCard, {
+      key: p.id,
+      p: p,
+      go: go,
+      onQuickAdd: onQuickAdd
+    }))));
+  }), saleItems.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "container section",
     style: {
       paddingTop: 0
@@ -1981,47 +2062,6 @@ function Home({
   }, "View All →")), /*#__PURE__*/React.createElement("div", {
     className: "grid"
   }, saleItems.map(p => /*#__PURE__*/React.createElement(ProductCard, {
-    key: p.id,
-    p: p,
-    go: go,
-    onQuickAdd: onQuickAdd
-  })))), bestSellers.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "container section",
-    style: {
-      paddingTop: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "section-head"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "eyebrow"
-  }, "Customer Favorites"), /*#__PURE__*/React.createElement("h2", null, "Best Sellers")), /*#__PURE__*/React.createElement("a", {
-    className: "view-all",
-    href: "#",
-    onClick: e => {
-      e.preventDefault();
-      go('shop', {
-        cat: 'all'
-      });
-    }
-  }, "View All →")), /*#__PURE__*/React.createElement("div", {
-    className: "grid"
-  }, bestSellers.map(p => /*#__PURE__*/React.createElement(ProductCard, {
-    key: p.id,
-    p: p,
-    go: go,
-    onQuickAdd: onQuickAdd
-  })))), rest.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "container section",
-    style: {
-      paddingTop: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "section-head"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "eyebrow"
-  }, "Everyday"), /*#__PURE__*/React.createElement("h2", null, "Casual & Kurtas"))), /*#__PURE__*/React.createElement("div", {
-    className: "grid"
-  }, rest.map(p => /*#__PURE__*/React.createElement(ProductCard, {
     key: p.id,
     p: p,
     go: go,
@@ -3187,6 +3227,7 @@ function emptyProduct(categories) {
     showNewArrival: false,
     showBestSeller: false,
     showCasualPick: false,
+    homepageSections: [],
     rating: 5
   };
 }
@@ -3194,10 +3235,11 @@ function ProductForm({
   initial,
   categories,
   categorySubcategories,
+  homepageSections,
   onSave,
   onCancel
 }) {
-  const [form, setForm] = useState(initial ? { ...emptyProduct(categories), ...initial, sizes: Array.isArray(initial.sizes) ? initial.sizes : [] } : emptyProduct(categories));
+  const [form, setForm] = useState(initial ? { ...emptyProduct(categories), ...initial, sizes: Array.isArray(initial.sizes) ? initial.sizes : [], homepageSections: Array.isArray(initial.homepageSections) ? initial.homepageSections : [] } : emptyProduct(categories));
   const [sizesText, setSizesText] = useState(Array.isArray(form.sizes) ? form.sizes.join(', ') : '');
   const availableSubs = (categorySubcategories && categorySubcategories[form.category]) || [];
   const [uploading, setUploading] = useState(false);
@@ -3407,42 +3449,29 @@ function ProductForm({
     }
   }, "Mark as Featured (shows on homepage)")), /*#__PURE__*/React.createElement("div", {
     className: "field"
-  }, /*#__PURE__*/React.createElement("label", null, "Show on Homepage Sections"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("label", null, "Show on Homepage Sections"), /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 11, color: 'var(--sand-dim)', marginTop: -4, marginBottom: 10 }
+  }, "Need a new section (e.g. Fashion Accessories)? Add it from \"Manage Homepage Sections\" above the product list."), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: 10 }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, (homepageSections || []).length === 0 ? /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 12.5, color: 'var(--sand-dim)' }
+  }, "No homepage sections yet.") : (homepageSections || []).map(sec => /*#__PURE__*/React.createElement("div", {
+    key: sec.key,
     style: { display: 'flex', alignItems: 'center', gap: 10 }
   }, /*#__PURE__*/React.createElement("input", {
     type: "checkbox",
-    id: "showNewArrival",
+    id: "sec_" + sec.key,
     style: { width: 'auto' },
-    checked: form.showNewArrival,
-    onChange: e => setForm(f => ({ ...f, showNewArrival: e.target.checked }))
+    checked: (form.homepageSections || []).includes(sec.key),
+    onChange: e => setForm(f => {
+      const cur = Array.isArray(f.homepageSections) ? f.homepageSections : [];
+      const next = e.target.checked ? [...cur, sec.key] : cur.filter(k => k !== sec.key);
+      return { ...f, homepageSections: next };
+    })
   }), /*#__PURE__*/React.createElement("label", {
-    htmlFor: "showNewArrival",
+    htmlFor: "sec_" + sec.key,
     style: { margin: 0 }
-  }, "New Arrivals")), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', gap: 10 }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    id: "showBestSeller",
-    style: { width: 'auto' },
-    checked: form.showBestSeller,
-    onChange: e => setForm(f => ({ ...f, showBestSeller: e.target.checked }))
-  }), /*#__PURE__*/React.createElement("label", {
-    htmlFor: "showBestSeller",
-    style: { margin: 0 }
-  }, "Best Sellers")), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', gap: 10 }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    id: "showCasualPick",
-    style: { width: 'auto' },
-    checked: form.showCasualPick,
-    onChange: e => setForm(f => ({ ...f, showCasualPick: e.target.checked }))
-  }), /*#__PURE__*/React.createElement("label", {
-    htmlFor: "showCasualPick",
-    style: { margin: 0 }
-  }, "Casual & Kurtas")))), /*#__PURE__*/React.createElement("div", {
+  }, sec.label))))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 12,
@@ -4096,6 +4125,109 @@ function ImageMigrationPanel({
     }
   }, progress));
 }
+function HomepageSectionManager({
+  homepageSections,
+  refreshHomepageSections,
+  fireToast
+}) {
+  const [newSec, setNewSec] = useState('');
+  const [saving, setSaving] = useState(false);
+  const handleAdd = async e => {
+    e.preventDefault();
+    const label = newSec.trim();
+    if (!label) return;
+    if ((homepageSections || []).some(s => s.label.toLowerCase() === label.toLowerCase())) {
+      fireToast('Section already exists');
+      return;
+    }
+    setSaving(true);
+    try {
+      await insertHomepageSection(label);
+      await refreshHomepageSections();
+      setNewSec('');
+      fireToast('Section added');
+    } catch (e) {
+      fireToast('Error adding section — check console');
+    }
+    setSaving(false);
+  };
+  const handleRemove = async sec => {
+    if (String(sec.id).startsWith('default-')) {
+      fireToast('Run the one-time database setup first (see instructions) before removing default sections.');
+      return;
+    }
+    if (!window.confirm(`Remove "${sec.label}" section? Products tagged with it will simply stop showing in that section.`)) return;
+    try {
+      await deleteHomepageSection(sec.id);
+      await refreshHomepageSections();
+      fireToast('Section removed');
+    } catch (e) {
+      fireToast('Error removing section — check console');
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-panel-box"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "serif"
+  }, "Manage Homepage Sections"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: 'var(--sand-dim)',
+      marginBottom: 16,
+      maxWidth: 560
+    }
+  }, "These are the tags products can be given to appear in a homepage section (like \"New Arrivals\"). Add your own — e.g. \"Fashion Accessories\" — without removing the existing ones; they'll then show up as a checkbox on every product's Add/Edit form."), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleAdd,
+    style: {
+      display: 'flex',
+      gap: 10,
+      marginBottom: 18,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: newSec,
+    onChange: e => setNewSec(e.target.value),
+    placeholder: "e.g. Fashion Accessories",
+    style: {
+      flex: 1,
+      minWidth: 180,
+      background: 'rgba(42,39,36,0.03)',
+      border: '1px solid var(--line)',
+      color: 'var(--ivory)',
+      padding: '12px 14px',
+      fontSize: 14
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    type: "submit",
+    disabled: saving
+  }, saving ? 'Adding…' : 'Add')), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 10
+    }
+  }, (homepageSections || []).map(sec => /*#__PURE__*/React.createElement("span", {
+    key: sec.key,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      border: '1px solid var(--line)',
+      padding: '8px 12px',
+      fontSize: 12.5
+    }
+  }, sec.label, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => handleRemove(sec),
+    style: {
+      color: 'var(--maroon-light)',
+      fontSize: 11,
+      textTransform: 'uppercase',
+      letterSpacing: '0.03em'
+    }
+  }, "Remove")))));
+}
 function AdminDashboard({
   products,
   setProducts,
@@ -4105,11 +4237,15 @@ function AdminDashboard({
   refreshCategories,
   categoryImages,
   categorySubcategories,
+  homepageSections,
+  refreshHomepageSections,
   go
 }) {
+  const [adminView, setAdminView] = useState('overview');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
   const handleSave = async product => {
     setSaving(true);
     try {
@@ -4144,6 +4280,28 @@ function AdminDashboard({
     }
   };
   const totalValue = products.reduce((s, p) => s + p.price, 0);
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q) || (p.subcategory || '').toLowerCase().includes(q));
+  }, [products, productSearch]);
+  const backLink = onClick => /*#__PURE__*/React.createElement("a", {
+    className: "back-link",
+    href: "#",
+    onClick: e => {
+      e.preventDefault();
+      onClick();
+    },
+    style: {
+      margin: '0 0 22px'
+    }
+  }, "← Back to Dashboard");
+  const backToOverview = () => {
+    setAdminView('overview');
+    setShowForm(false);
+    setEditing(null);
+    setProductSearch('');
+  };
   return /*#__PURE__*/React.createElement("div", {
     className: "admin-shell"
   }, /*#__PURE__*/React.createElement("div", {
@@ -4195,26 +4353,84 @@ function AdminDashboard({
     className: "num serif"
   }, "Rs. ", totalValue.toLocaleString()), /*#__PURE__*/React.createElement("div", {
     className: "lbl"
-  }, "Catalog Value"))), /*#__PURE__*/React.createElement(ImageMigrationPanel, {
+  }, "Catalog Value"))), adminView === 'overview' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AdminOrders, {
+    fireToast: fireToast
+  }), /*#__PURE__*/React.createElement(ImageMigrationPanel, {
     products: products,
     setProducts: setProducts,
     categories: categories,
     categoryImages: categoryImages,
     refreshCategories: refreshCategories,
     fireToast: fireToast
-  }), /*#__PURE__*/React.createElement(AdminOrders, {
-    fireToast: fireToast
-  }), /*#__PURE__*/React.createElement(CategoryManager, {
-    categories: categories,
-    categoryImages: categoryImages,
-    categorySubcategories: categorySubcategories,
-    refreshCategories: refreshCategories,
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 20,
+      marginBottom: 30
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "admin-panel-box",
+    onClick: () => setAdminView('products'),
+    style: {
+      cursor: 'pointer',
+      textAlign: 'center',
+      padding: '36px 20px',
+      transition: 'border-color .2s'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 30,
+      color: 'var(--brass)',
+      marginBottom: 10
+    }
+  }, "🛍️"), /*#__PURE__*/React.createElement("h3", {
+    className: "serif",
+    style: {
+      marginBottom: 6,
+      fontSize: 18
+    }
+  }, "Manage Products"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--sand-dim)'
+    }
+  }, products.length, " products — add, edit, search & delete")), /*#__PURE__*/React.createElement("div", {
+    className: "admin-panel-box",
+    onClick: () => setAdminView('categories'),
+    style: {
+      cursor: 'pointer',
+      textAlign: 'center',
+      padding: '36px 20px',
+      transition: 'border-color .2s'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 30,
+      color: 'var(--brass)',
+      marginBottom: 10
+    }
+  }, "🗂️"), /*#__PURE__*/React.createElement("h3", {
+    className: "serif",
+    style: {
+      marginBottom: 6,
+      fontSize: 18
+    }
+  }, "Manage Categories"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--sand-dim)'
+    }
+  }, categories.length, " categories & their subcategories")))), adminView === 'products' && /*#__PURE__*/React.createElement(React.Fragment, null, backLink(backToOverview), /*#__PURE__*/React.createElement(HomepageSectionManager, {
+    homepageSections: homepageSections,
+    refreshHomepageSections: refreshHomepageSections,
     fireToast: fireToast
   }), showForm ? /*#__PURE__*/React.createElement(ProductForm, {
     key: editing ? editing.id : 'new',
     initial: editing,
     categories: categories,
     categorySubcategories: categorySubcategories,
+    homepageSections: homepageSections,
     onSave: handleSave,
     onCancel: () => {
       setShowForm(false);
@@ -4228,13 +4444,41 @@ function AdminDashboard({
     }
   }, "+ Add New Product"), /*#__PURE__*/React.createElement("div", {
     className: "admin-panel-box"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 14,
+      flexWrap: 'wrap',
+      marginBottom: 20
+    }
   }, /*#__PURE__*/React.createElement("h3", {
-    className: "serif"
-  }, "All Products"), products.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "serif",
+    style: {
+      margin: 0
+    }
+  }, "All Products"), /*#__PURE__*/React.createElement("input", {
+    value: productSearch,
+    onChange: e => setProductSearch(e.target.value),
+    placeholder: "Search products by name or category…",
+    style: {
+      flex: 1,
+      minWidth: 200,
+      maxWidth: 340,
+      background: 'rgba(42,39,36,0.03)',
+      border: '1px solid var(--line)',
+      color: 'var(--ivory)',
+      padding: '10px 14px',
+      fontSize: 13.5
+    }
+  })), products.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
-  }, /*#__PURE__*/React.createElement("h3", null, "No products yet"), /*#__PURE__*/React.createElement("p", null, "Click \"Add New Product\" to get started.")) : /*#__PURE__*/React.createElement("table", {
+  }, /*#__PURE__*/React.createElement("h3", null, "No products yet"), /*#__PURE__*/React.createElement("p", null, "Click \"Add New Product\" to get started.")) : filteredProducts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("h3", null, "No matches"), /*#__PURE__*/React.createElement("p", null, "Try a different search term.")) : /*#__PURE__*/React.createElement("table", {
     className: "admin-table"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null), /*#__PURE__*/React.createElement("th", null, "Name"), /*#__PURE__*/React.createElement("th", null, "Category"), /*#__PURE__*/React.createElement("th", null, "Price"), /*#__PURE__*/React.createElement("th", null, "Featured"), /*#__PURE__*/React.createElement("th", null, "Actions"))), /*#__PURE__*/React.createElement("tbody", null, products.map(p => /*#__PURE__*/React.createElement("tr", {
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null), /*#__PURE__*/React.createElement("th", null, "Name"), /*#__PURE__*/React.createElement("th", null, "Category"), /*#__PURE__*/React.createElement("th", null, "Price"), /*#__PURE__*/React.createElement("th", null, "Featured"), /*#__PURE__*/React.createElement("th", null, "Actions"))), /*#__PURE__*/React.createElement("tbody", null, filteredProducts.map(p => /*#__PURE__*/React.createElement("tr", {
     key: p.id
   }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("img", {
     src: p.images[0],
@@ -4254,7 +4498,13 @@ function AdminDashboard({
   }, "Edit"), /*#__PURE__*/React.createElement("button", {
     className: "link-btn danger",
     onClick: () => handleDelete(p.id)
-  }, "Delete"))))))))));
+  }, "Delete"))))))))), adminView === 'categories' && /*#__PURE__*/React.createElement(React.Fragment, null, backLink(backToOverview), /*#__PURE__*/React.createElement(CategoryManager, {
+    categories: categories,
+    categoryImages: categoryImages,
+    categorySubcategories: categorySubcategories,
+    refreshCategories: refreshCategories,
+    fireToast: fireToast
+  }))));
 }
 function Admin({
   products,
@@ -4264,6 +4514,8 @@ function Admin({
   refreshCategories,
   categoryImages,
   categorySubcategories,
+  homepageSections,
+  refreshHomepageSections,
   go
 }) {
   const [authed, setAuthed] = useState(false);
@@ -4310,6 +4562,8 @@ function Admin({
     refreshCategories: refreshCategories,
     categoryImages: categoryImages,
     categorySubcategories: categorySubcategories,
+    homepageSections: homepageSections,
+    refreshHomepageSections: refreshHomepageSections,
     go: go
   });
 }
@@ -4553,14 +4807,42 @@ function Footer({
   }, "Staff")))));
 }
 
+/* ---------------- URL deep-linking (so products/pages can be shared/linked directly, e.g. in ads) ---------------- */
+function buildUrl(route, params) {
+  const usp = new URLSearchParams();
+  if (route && route !== 'home') usp.set('r', route);
+  if (params) {
+    if (params.cat && params.cat !== 'all') usp.set('cat', params.cat);
+    if (params.sub && params.sub !== 'all') usp.set('sub', params.sub);
+    if (params.id) usp.set('id', params.id);
+    if (params.page) usp.set('p', params.page);
+  }
+  const qs = usp.toString();
+  return qs ? '?' + qs : window.location.pathname;
+}
+function parseUrl() {
+  const usp = new URLSearchParams(window.location.search);
+  const route = usp.get('r') || 'home';
+  const params = {};
+  if (usp.get('cat')) params.cat = usp.get('cat');
+  if (usp.get('sub')) params.sub = usp.get('sub');
+  if (usp.get('id')) params.id = usp.get('id');
+  if (usp.get('p')) params.page = usp.get('p');
+  return {
+    route,
+    params
+  };
+}
+
 /* ---------------- App Shell ---------------- */
 function App() {
-  const [route, setRoute] = useState('home');
-  const [params, setParams] = useState({});
+  const [route, setRoute] = useState(() => parseUrl().route);
+  const [params, setParams] = useState(() => parseUrl().params);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [categoryImages, setCategoryImages] = useState({});
   const [categorySubcategories, setCategorySubcategories] = useState({});
+  const [homepageSections, setHomepageSections] = useState(DEFAULT_HOMEPAGE_SECTIONS);
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -4573,6 +4855,10 @@ function App() {
     setCategoryImages(imgs);
     if (Object.keys(subs).length) setCategorySubcategories(subs);
   };
+  const refreshHomepageSections = async () => {
+    const secs = await loadHomepageSections();
+    if (secs && secs.length) setHomepageSections(secs);
+  };
   useEffect(() => {
     (async () => {
       // Only block the UI on products loading — everything else loads in the background
@@ -4582,10 +4868,11 @@ function App() {
       setLoading(false);
 
       // Background: categories, session, cart — none of these should delay first paint
-      const [sess, cats, imgs, subs] = await Promise.all([getCurrentSession(), loadCategories(), loadCategoryImages(), loadCategorySubcategories()]);
+      const [sess, cats, imgs, subs, secs] = await Promise.all([getCurrentSession(), loadCategories(), loadCategoryImages(), loadCategorySubcategories(), loadHomepageSections()]);
       if (cats.length) setCategories(cats);
       setCategoryImages(imgs);
       if (Object.keys(subs).length) setCategorySubcategories(subs);
+      if (secs && secs.length) setHomepageSections(secs);
       setSession(sess);
       const c = await loadCart(sess ? sess.user.id : null);
       setCart(c);
@@ -4603,13 +4890,19 @@ function App() {
   }, []);
   useEffect(() => {
     window.history.replaceState({
-      route: 'home',
-      params: {}
-    }, '', '');
+      route: route,
+      params: params
+    }, '', buildUrl(route, params));
     const onPopState = e => {
       const state = e.state;
-      setRoute(state ? state.route : 'home');
-      setParams(state ? state.params || {} : {});
+      if (state) {
+        setRoute(state.route);
+        setParams(state.params || {});
+      } else {
+        const parsed = parseUrl();
+        setRoute(parsed.route);
+        setParams(parsed.params);
+      }
       window.scrollTo({
         top: 0,
         behavior: 'instant'
@@ -4624,7 +4917,7 @@ function App() {
     window.history.pushState({
       route: r,
       params: p
-    }, '', '');
+    }, '', buildUrl(r, p));
     window.scrollTo({
       top: 0,
       behavior: 'instant'
@@ -4747,6 +5040,8 @@ function App() {
       refreshCategories: refreshCategories,
       categoryImages: categoryImages,
       categorySubcategories: categorySubcategories,
+      homepageSections: homepageSections,
+      refreshHomepageSections: refreshHomepageSections,
       go: go
     }), toastNode);
   }
@@ -4793,7 +5088,8 @@ function App() {
     go: go,
     onQuickAdd: quickAdd,
     categories: categories,
-    categoryImages: categoryImages
+    categoryImages: categoryImages,
+    homepageSections: homepageSections
   }), route === 'shop' && /*#__PURE__*/React.createElement(Shop, {
     products: products,
     params: params,
