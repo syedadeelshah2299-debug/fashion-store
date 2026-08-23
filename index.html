@@ -2229,17 +2229,15 @@ function Shop({
     className: "filter-bar"
   }, /*#__PURE__*/React.createElement("button", {
     className: `chip ${cat === 'all' ? 'active' : ''}`,
-    onClick: () => {
-      setCat('all');
-      setSub('all');
-    }
+    onClick: () => go('shop', {
+      cat: 'all'
+    })
   }, "All"), categories.map(c => /*#__PURE__*/React.createElement("button", {
     key: c,
     className: `chip ${cat === c ? 'active' : ''}`,
-    onClick: () => {
-      setCat(c);
-      setSub('all');
-    }
+    onClick: () => go('shop', {
+      cat: c
+    })
   }, c))), /*#__PURE__*/React.createElement("div", {
     className: "search-bar-row"
   }, /*#__PURE__*/React.createElement("input", {
@@ -2255,7 +2253,10 @@ function Shop({
   }, subsForCat.map(s => /*#__PURE__*/React.createElement("div", {
     className: "subcat-card",
     key: s.id || s.name,
-    onClick: () => setSub(s.name)
+    onClick: () => go('shop', {
+      cat: cat,
+      sub: s.name
+    })
   }, /*#__PURE__*/React.createElement("div", {
     className: "subcat-media"
   }, /*#__PURE__*/React.createElement("img", {
@@ -2269,17 +2270,26 @@ function Shop({
     style: {
       marginBottom: 30
     },
-    onClick: () => setSub('__all_in_cat__')
+    onClick: () => go('shop', {
+      cat: cat,
+      sub: '__all_in_cat__'
+    })
   }, "View All in ", cat)) : /*#__PURE__*/React.createElement(React.Fragment, null, cat !== 'all' && subsForCat.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "filter-bar",
     style: { marginBottom: 24 }
   }, /*#__PURE__*/React.createElement("button", {
     className: `chip ${sub === '__all_in_cat__' ? 'active' : ''}`,
-    onClick: () => setSub('__all_in_cat__')
+    onClick: () => go('shop', {
+      cat: cat,
+      sub: '__all_in_cat__'
+    })
   }, "All ", cat), subsForCat.map(s => /*#__PURE__*/React.createElement("button", {
     key: s.id || s.name,
     className: `chip ${sub === s.name ? 'active' : ''}`,
-    onClick: () => setSub(s.name)
+    onClick: () => go('shop', {
+      cat: cat,
+      sub: s.name
+    })
   }, s.name))), sub !== 'all' && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 24,
@@ -2291,7 +2301,9 @@ function Shop({
       color: 'var(--brass)'
     }
   }, sub === '__all_in_cat__' ? `All ${cat}` : sub), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setSub('all'),
+    onClick: () => go('shop', {
+      cat: cat
+    }),
     style: {
       marginLeft: 10,
       color: 'var(--maroon)',
