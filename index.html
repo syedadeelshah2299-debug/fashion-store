@@ -534,7 +534,7 @@
 
   /* ---------- Top Subcategories ---------- */
   .subcat-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px 14px; }
-  @media (max-width:700px){ .subcat-grid{ gap:12px 10px; } }
+  @media (max-width:700px){ .subcat-grid{ grid-template-columns:repeat(3, 1fr); gap:12px 10px; } }
   .subcat-card{
     cursor:pointer; text-align:center; border:1px solid var(--line); border-radius:10px;
     padding:10px 10px 14px; background:rgba(156,122,94,0.04);
@@ -543,15 +543,16 @@
   .subcat-card:hover{ transform:translateY(-4px); box-shadow:0 18px 30px -16px rgba(0,0,0,0.35); border-color:var(--brass); }
   .subcat-media{
     aspect-ratio:1/1; border-radius:7px; overflow:hidden; background:var(--sand);
+    display:flex; align-items:center; justify-content:center;
   }
-  .subcat-media img{ width:100%; height:100%; object-fit:cover; transition:transform .5s ease; }
+  .subcat-media img{ width:100%; height:100%; object-fit:contain; transition:transform .5s ease; }
   .subcat-card:hover .subcat-media img{ transform:scale(1.06); }
   .subcat-label{ margin-top:11px; font-size:12.5px; font-weight:700; letter-spacing:0.03em; color:var(--ivory); }
   @media (max-width:560px){
-    .subcat-grid{ grid-template-columns:repeat(4, 1fr); gap:8px 8px; }
-    .subcat-card{ border-radius:8px; padding:7px 6px 10px; }
-    .subcat-media{ border-radius:5px; }
-    .subcat-label{ font-size:9.5px; margin-top:7px; line-height:1.25; }
+    .subcat-grid{ grid-template-columns:repeat(2, 1fr); gap:12px 10px; }
+    .subcat-card{ border-radius:10px; padding:10px 8px 12px; }
+    .subcat-media{ border-radius:7px; }
+    .subcat-label{ font-size:12px; margin-top:9px; line-height:1.3; }
   }
 </style>
 </head>
@@ -1570,11 +1571,81 @@ function Nav({
   }, sub.name)))))));
 }
 
+/* ---------------- Hero Settings (editable homepage banner) ---------------- */
+const DEFAULT_HERO_SETTINGS = {
+  eyebrow: 'New Season Edit',
+  heading: 'Fabric, cut,\nand **quiet** luxury.',
+  subtext: "Hand-finished suits and kurtas built for Pakistani mornings — light lawns for the heat, structured formals for the evening. Every piece made to be worn, not just photographed.",
+  primary_btn_text: 'Shop the Edit',
+  primary_btn_target: 'all',
+  secondary_btn_text: '',
+  secondary_btn_target: ''
+};
+async function loadHeroSettings() {
+  if (!supabaseClient) return null;
+  try {
+    const {
+      data,
+      error
+    } = await supabaseClient.from('hero_settings').select('*').eq('id', 1).maybeSingle();
+    if (error) {
+      console.error('Supabase hero settings load error:', error);
+      return null;
+    }
+    return data || null;
+  } catch (e) {
+    console.error('Supabase hero settings load exception:', e);
+    return null;
+  }
+}
+async function saveHeroSettings(settings) {
+  if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const {
+    error
+  } = await supabaseClient.from('hero_settings').upsert({
+    id: 1,
+    ...settings,
+    updated_at: new Date().toISOString()
+  }, {
+    onConflict: 'id'
+  });
+  if (error) {
+    console.error('Supabase hero settings save error:', error);
+    throw error;
+  }
+}
+/* Turns "Line one\nLine **two**" into React children: line breaks + brass italic emphasis for **word** */
+function renderHeroHeading(text) {
+  const lines = (text || '').split('\n');
+  const nodes = [];
+  lines.forEach((line, li) => {
+    if (li > 0) nodes.push(/*#__PURE__*/React.createElement("br", {
+      key: 'br' + li
+    }));
+    const parts = line.split(/\*\*(.+?)\*\*/g);
+    parts.forEach((part, pi) => {
+      if (pi % 2 === 1) {
+        nodes.push(/*#__PURE__*/React.createElement("em", {
+          key: li + '-' + pi
+        }, part));
+      } else if (part) {
+        nodes.push(part);
+      }
+    });
+  });
+  return nodes;
+}
+
 /* ---------------- Hero ---------------- */
 function Hero({
   go,
-  featuredProduct
+  featuredProduct,
+  categories,
+  heroSettings
 }) {
+  const hs = heroSettings || DEFAULT_HERO_SETTINGS;
+  const secondaryTarget = hs.secondary_btn_target || (categories && categories.length ? categories[0] : null);
+  const secondaryLabel = hs.secondary_btn_text || secondaryTarget;
   const hasRealImage = featuredProduct && featuredProduct.images && featuredProduct.images[0] && !featuredProduct.images[0].startsWith('data:image/svg+xml');
   return /*#__PURE__*/React.createElement("header", {
     className: "hero"
@@ -1584,21 +1655,21 @@ function Hero({
     className: "rule"
   }), /*#__PURE__*/React.createElement("span", {
     className: "eyebrow"
-  }, "New Season Edit")), /*#__PURE__*/React.createElement("h1", null, "Fabric, cut,", /*#__PURE__*/React.createElement("br", null), "and ", /*#__PURE__*/React.createElement("em", null, "quiet"), " luxury."), /*#__PURE__*/React.createElement("p", {
+  }, hs.eyebrow || DEFAULT_HERO_SETTINGS.eyebrow)), /*#__PURE__*/React.createElement("h1", null, renderHeroHeading(hs.heading || DEFAULT_HERO_SETTINGS.heading)), /*#__PURE__*/React.createElement("p", {
     className: "lead"
-  }, "Hand-finished suits and kurtas built for Pakistani mornings — light lawns for the heat, structured formals for the evening. Every piece made to be worn, not just photographed."), /*#__PURE__*/React.createElement("div", {
+  }, hs.subtext || DEFAULT_HERO_SETTINGS.subtext), /*#__PURE__*/React.createElement("div", {
     className: "hero-ctas"
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary",
     onClick: () => go('shop', {
-      cat: 'all'
+      cat: hs.primary_btn_target || 'all'
     })
-  }, "Shop the Edit"), /*#__PURE__*/React.createElement("button", {
+  }, hs.primary_btn_text || DEFAULT_HERO_SETTINGS.primary_btn_text), secondaryTarget && /*#__PURE__*/React.createElement("button", {
     className: "btn btn-outline",
     onClick: () => go('shop', {
-      cat: 'Unstitched Suits'
+      cat: secondaryTarget
     })
-  }, "Unstitched Suits")), /*#__PURE__*/React.createElement("div", {
+  }, secondaryLabel)), /*#__PURE__*/React.createElement("div", {
     className: "hero-trust"
   }, /*#__PURE__*/React.createElement("div", {
     className: "ht-item"
@@ -1979,7 +2050,8 @@ function Home({
   onQuickAdd,
   categories,
   categoryImages,
-  homepageSections
+  homepageSections,
+  heroSettings
 }) {
   const featured = products.filter(p => p.featured).slice(0, 4);
   const showcase = featured.length ? featured : products.slice(0, 4);
@@ -1987,7 +2059,9 @@ function Home({
   const saleItems = useMemo(() => products.filter(p => p.originalPrice && p.originalPrice > p.price).slice(0, 4), [products]);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Hero, {
     go: go,
-    featuredProduct: heroProduct
+    featuredProduct: heroProduct,
+    categories: categories,
+    heroSettings: heroSettings
   }), /*#__PURE__*/React.createElement(TrustStrip, null), /*#__PURE__*/React.createElement(Marquee, null), /*#__PURE__*/React.createElement(TopSubcategories, {
     categories: categories,
     categoryImages: categoryImages,
@@ -2700,10 +2774,10 @@ const SIZE_CHART_DATA = [{
   sleeve: '24.5 in'
 }];
 function SizeChart({
-  category
+  show
 }) {
   const [open, setOpen] = useState(false);
-  if (!SIZE_CHART_CATEGORIES.includes(category)) return null;
+  if (!show) return null;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 26
@@ -3031,7 +3105,7 @@ function ProductDetail({
   }, p.stock > 0 ? (p.stock <= 5 ? `Only ${p.stock} left in stock` : 'In Stock') : 'Out of Stock'), /*#__PURE__*/React.createElement(DescriptionList, {
     text: p.desc
   }), /*#__PURE__*/React.createElement(SizeChart, {
-    category: p.category
+    show: needsSize
   }), needsSize && /*#__PURE__*/React.createElement("div", {
     style: { marginBottom: 26 }
   }, /*#__PURE__*/React.createElement("div", {
@@ -4269,6 +4343,164 @@ function HomepageSectionManager({
     }
   }, "Remove")))));
 }
+function HeroSettingsManager({
+  heroSettings,
+  categories,
+  refreshHeroSettings,
+  fireToast
+}) {
+  const initial = heroSettings || DEFAULT_HERO_SETTINGS;
+  const [form, setForm] = useState({
+    eyebrow: initial.eyebrow || '',
+    heading: initial.heading || '',
+    subtext: initial.subtext || '',
+    primary_btn_text: initial.primary_btn_text || '',
+    primary_btn_target: initial.primary_btn_target || 'all',
+    secondary_btn_text: initial.secondary_btn_text || '',
+    secondary_btn_target: initial.secondary_btn_target || ''
+  });
+  const [saving, setSaving] = useState(false);
+  const handleSave = async e => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await saveHeroSettings(form);
+      await refreshHeroSettings();
+      fireToast('Homepage banner updated');
+    } catch (err) {
+      fireToast('Error saving — check console');
+    }
+    setSaving(false);
+  };
+  const handleReset = async () => {
+    if (!window.confirm('Reset the banner back to the original default text?')) return;
+    setSaving(true);
+    try {
+      await saveHeroSettings(DEFAULT_HERO_SETTINGS);
+      await refreshHeroSettings();
+      setForm({
+        eyebrow: DEFAULT_HERO_SETTINGS.eyebrow,
+        heading: DEFAULT_HERO_SETTINGS.heading,
+        subtext: DEFAULT_HERO_SETTINGS.subtext,
+        primary_btn_text: DEFAULT_HERO_SETTINGS.primary_btn_text,
+        primary_btn_target: DEFAULT_HERO_SETTINGS.primary_btn_target,
+        secondary_btn_text: '',
+        secondary_btn_target: ''
+      });
+      fireToast('Banner reset to default');
+    } catch (err) {
+      fireToast('Error resetting — check console');
+    }
+    setSaving(false);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-panel-box"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "serif"
+  }, "Homepage Banner"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: 'var(--sand-dim)',
+      marginBottom: 22,
+      maxWidth: 560
+    }
+  }, "This is the big banner at the top of your homepage — the heading, description, and the two buttons. Leave a field blank to fall back to the default. In the Heading, wrap a word in ", /*#__PURE__*/React.createElement("code", null, "**like this**"), " to make it stand out in brass, and start a new line to break the heading in two."), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSave
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", null, "Small Label (Eyebrow)"), /*#__PURE__*/React.createElement("input", {
+    value: form.eyebrow,
+    onChange: e => setForm(f => ({
+      ...f,
+      eyebrow: e.target.value
+    })),
+    placeholder: DEFAULT_HERO_SETTINGS.eyebrow
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", null, "Heading"), /*#__PURE__*/React.createElement("textarea", {
+    value: form.heading,
+    onChange: e => setForm(f => ({
+      ...f,
+      heading: e.target.value
+    })),
+    placeholder: DEFAULT_HERO_SETTINGS.heading,
+    style: {
+      minHeight: 80
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", null, "Description"), /*#__PURE__*/React.createElement("textarea", {
+    value: form.subtext,
+    onChange: e => setForm(f => ({
+      ...f,
+      subtext: e.target.value
+    })),
+    placeholder: DEFAULT_HERO_SETTINGS.subtext
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field-row"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", null, "Main Button Text"), /*#__PURE__*/React.createElement("input", {
+    value: form.primary_btn_text,
+    onChange: e => setForm(f => ({
+      ...f,
+      primary_btn_text: e.target.value
+    })),
+    placeholder: DEFAULT_HERO_SETTINGS.primary_btn_text
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", null, "Main Button Goes To"), /*#__PURE__*/React.createElement("select", {
+    value: form.primary_btn_target,
+    onChange: e => setForm(f => ({
+      ...f,
+      primary_btn_target: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "All Products"), (categories || []).map(c => /*#__PURE__*/React.createElement("option", {
+    key: c,
+    value: c
+  }, c))))), /*#__PURE__*/React.createElement("div", {
+    className: "field-row"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", null, "Second Button Text (optional)"), /*#__PURE__*/React.createElement("input", {
+    value: form.secondary_btn_text,
+    onChange: e => setForm(f => ({
+      ...f,
+      secondary_btn_text: e.target.value
+    })),
+    placeholder: "Leave blank to use the category name"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", null, "Second Button Goes To (optional)"), /*#__PURE__*/React.createElement("select", {
+    value: form.secondary_btn_target,
+    onChange: e => setForm(f => ({
+      ...f,
+      secondary_btn_target: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "— Hide this button —"), (categories || []).map(c => /*#__PURE__*/React.createElement("option", {
+    key: c,
+    value: c
+  }, c))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 12,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    type: "submit",
+    disabled: saving
+  }, saving ? 'Saving…' : 'Save Banner'), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-outline",
+    type: "button",
+    onClick: handleReset,
+    disabled: saving
+  }, "Reset to Default"))));
+}
 function AdminDashboard({
   products,
   setProducts,
@@ -4280,6 +4512,8 @@ function AdminDashboard({
   categorySubcategories,
   homepageSections,
   refreshHomepageSections,
+  heroSettings,
+  refreshHeroSettings,
   go
 }) {
   const [adminView, setAdminView] = useState('overview');
@@ -4406,7 +4640,7 @@ function AdminDashboard({
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
       gap: 20,
       marginBottom: 30
     }
@@ -4462,7 +4696,38 @@ function AdminDashboard({
       fontSize: 12.5,
       color: 'var(--sand-dim)'
     }
-  }, categories.length, " categories & their subcategories")))), adminView === 'products' && /*#__PURE__*/React.createElement(React.Fragment, null, backLink(backToOverview), /*#__PURE__*/React.createElement(HomepageSectionManager, {
+  }, categories.length, " categories & their subcategories")), /*#__PURE__*/React.createElement("div", {
+    className: "admin-panel-box",
+    onClick: () => setAdminView('homepage'),
+    style: {
+      cursor: 'pointer',
+      textAlign: 'center',
+      padding: '36px 20px',
+      transition: 'border-color .2s'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 30,
+      color: 'var(--brass)',
+      marginBottom: 10
+    }
+  }, "🏠"), /*#__PURE__*/React.createElement("h3", {
+    className: "serif",
+    style: {
+      marginBottom: 6,
+      fontSize: 18
+    }
+  }, "Homepage Banner"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--sand-dim)'
+    }
+  }, "Edit the top banner text & buttons")))), adminView === 'homepage' && /*#__PURE__*/React.createElement(React.Fragment, null, backLink(backToOverview), /*#__PURE__*/React.createElement(HeroSettingsManager, {
+    heroSettings: heroSettings,
+    categories: categories,
+    refreshHeroSettings: refreshHeroSettings,
+    fireToast: fireToast
+  })), adminView === 'products' && /*#__PURE__*/React.createElement(React.Fragment, null, backLink(backToOverview), /*#__PURE__*/React.createElement(HomepageSectionManager, {
     homepageSections: homepageSections,
     refreshHomepageSections: refreshHomepageSections,
     fireToast: fireToast
@@ -4557,6 +4822,8 @@ function Admin({
   categorySubcategories,
   homepageSections,
   refreshHomepageSections,
+  heroSettings,
+  refreshHeroSettings,
   go
 }) {
   const [authed, setAuthed] = useState(false);
@@ -4605,6 +4872,8 @@ function Admin({
     categorySubcategories: categorySubcategories,
     homepageSections: homepageSections,
     refreshHomepageSections: refreshHomepageSections,
+    heroSettings: heroSettings,
+    refreshHeroSettings: refreshHeroSettings,
     go: go
   });
 }
@@ -4694,7 +4963,8 @@ function InfoPage({
   }, "Email Us"));
 }
 function Footer({
-  go
+  go,
+  categories
 }) {
   return /*#__PURE__*/React.createElement("footer", {
     className: "footer"
@@ -4712,39 +4982,17 @@ function Footer({
       lineHeight: 1.7,
       maxWidth: 280
     }
-  }, "Small-batch fashion made in Pakistan. Fabric-first, finished by hand, built to be worn often.")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h4", null, "Shop"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
+  }, "Small-batch fashion made in Pakistan. Fabric-first, finished by hand, built to be worn often.")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h4", null, "Shop"), /*#__PURE__*/React.createElement("ul", null, (categories || []).slice(0, 4).map(cat => /*#__PURE__*/React.createElement("li", {
+    key: cat
+  }, /*#__PURE__*/React.createElement("a", {
     href: "#",
     onClick: e => {
       e.preventDefault();
       go('shop', {
-        cat: 'Unstitched Suits'
+        cat: cat
       });
     }
-  }, "Unstitched Suits")), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
-    href: "#",
-    onClick: e => {
-      e.preventDefault();
-      go('shop', {
-        cat: 'Stitched Kurtas'
-      });
-    }
-  }, "Stitched Kurtas")), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
-    href: "#",
-    onClick: e => {
-      e.preventDefault();
-      go('shop', {
-        cat: 'Formal Wear'
-      });
-    }
-  }, "Formal Wear")), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
-    href: "#",
-    onClick: e => {
-      e.preventDefault();
-      go('shop', {
-        cat: 'Casual Wear'
-      });
-    }
-  }, "Casual Wear")))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h4", null, "Help"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
+  }, cat))))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h4", null, "Help"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
     href: "#",
     onClick: e => {
       e.preventDefault();
@@ -4886,6 +5134,7 @@ function App() {
   const [categoryImages, setCategoryImages] = useState({});
   const [categorySubcategories, setCategorySubcategories] = useState({});
   const [homepageSections, setHomepageSections] = useState(DEFAULT_HOMEPAGE_SECTIONS);
+  const [heroSettings, setHeroSettings] = useState(null);
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -4902,6 +5151,10 @@ function App() {
     const secs = await loadHomepageSections();
     if (secs && secs.length) setHomepageSections(secs);
   };
+  const refreshHeroSettings = async () => {
+    const hs = await loadHeroSettings();
+    setHeroSettings(hs);
+  };
   useEffect(() => {
     (async () => {
       // Only block the UI on products loading — everything else loads in the background
@@ -4911,11 +5164,12 @@ function App() {
       setLoading(false);
 
       // Background: categories, session, cart — none of these should delay first paint
-      const [sess, cats, imgs, subs, secs] = await Promise.all([getCurrentSession(), loadCategories(), loadCategoryImages(), loadCategorySubcategories(), loadHomepageSections()]);
+      const [sess, cats, imgs, subs, secs, hs] = await Promise.all([getCurrentSession(), loadCategories(), loadCategoryImages(), loadCategorySubcategories(), loadHomepageSections(), loadHeroSettings()]);
       if (cats.length) setCategories(cats);
       setCategoryImages(imgs);
       if (Object.keys(subs).length) setCategorySubcategories(subs);
       if (secs && secs.length) setHomepageSections(secs);
+      setHeroSettings(hs);
       setSession(sess);
       const c = await loadCart(sess ? sess.user.id : null);
       setCart(c);
@@ -5085,6 +5339,8 @@ function App() {
       categorySubcategories: categorySubcategories,
       homepageSections: homepageSections,
       refreshHomepageSections: refreshHomepageSections,
+      heroSettings: heroSettings,
+      refreshHeroSettings: refreshHeroSettings,
       go: go
     }), toastNode);
   }
@@ -5105,7 +5361,8 @@ function App() {
       go: go,
       clearCart: clearCart
     }), /*#__PURE__*/React.createElement(Footer, {
-      go: go
+      go: go,
+      categories: categories
     }), toastNode);
   }
   return /*#__PURE__*/React.createElement("div", {
@@ -5132,7 +5389,8 @@ function App() {
     onQuickAdd: quickAdd,
     categories: categories,
     categoryImages: categoryImages,
-    homepageSections: homepageSections
+    homepageSections: homepageSections,
+    heroSettings: heroSettings
   }), route === 'shop' && /*#__PURE__*/React.createElement(Shop, {
     products: products,
     params: params,
@@ -5157,7 +5415,8 @@ function App() {
     onLogout: handleLogout,
     fireToast: fireToast
   }), /*#__PURE__*/React.createElement(Footer, {
-    go: go
+    go: go,
+    categories: categories
   }), /*#__PURE__*/React.createElement(CartDrawer, {
     open: cartOpen,
     close: () => setCartOpen(false),
