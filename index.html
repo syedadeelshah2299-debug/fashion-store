@@ -787,31 +787,24 @@ function productToRow(p) {
   };
 }
 
-/* Uploads an image file to the 'Product-images' storage bucket and returns its public URL */
-const IMAGE_BUCKET = 'Product-images';
+/* Uploads an image file to Cloudinary (free, no egress limit like Supabase) and returns its public URL */
+const CLOUDINARY_CLOUD_NAME = 'sebvexz7';
+const CLOUDINARY_UPLOAD_PRESET = 'noor-weave-uploads';
 async function uploadImageToBucket(file) {
-  if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
-  let ext = 'jpg';
-  if (file.name && file.name.includes('.')) {
-    ext = file.name.split('.').pop();
-  } else if (file.type && file.type.includes('/')) {
-    ext = file.type.split('/').pop().replace('jpeg', 'jpg');
-  }
-  const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-  const {
-    error
-  } = await supabaseClient.storage.from(IMAGE_BUCKET).upload(path, file, {
-    cacheControl: '3600',
-    upsert: false
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+    method: 'POST',
+    body: formData
   });
-  if (error) {
-    console.error('Storage upload error:', error);
-    throw error;
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('Cloudinary upload error:', errText);
+    throw new Error('Image upload failed');
   }
-  const {
-    data
-  } = supabaseClient.storage.from(IMAGE_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  const data = await res.json();
+  return data.secure_url;
 }
 
 /* Converts a base64 data URL (old-style stored image) into a Blob for re-upload */
@@ -3685,10 +3678,10 @@ function AdminOrders({
 }
 /* ---------------- Image Migration (moves old base64 images to Storage bucket) ---------------- */
 /* The OLD project's storage domain — any image still hosted here needs moving before that project can be deleted */
-const OLD_PROJECT_HOST = 'qkysezjkclpclkmrnops.supabase.co';
+/* Any image still hosted on ANY Supabase project's storage needs moving to Cloudinary (no egress limit there) */
 function needsImageMigration(img) {
   if (typeof img !== 'string') return false;
-  return img.startsWith('data:') || img.includes(OLD_PROJECT_HOST);
+  return img.startsWith('data:') || img.includes('.supabase.co/storage/');
 }
 async function getBlobForImage(img) {
   if (img.startsWith('data:')) return dataUrlToBlob(img);
@@ -3721,7 +3714,7 @@ function ImageMigrationPanel({
   const pendingCount = countBase64Images(products, categoryImages);
   if (pendingCount === 0) return null;
   const runMigration = async () => {
-    if (!window.confirm(`This will move ${pendingCount} old image(s) into your current storage. Your products and categories will stay the same — only the image links get updated. Continue?`)) return;
+    if (!window.confirm(`This will move ${pendingCount} image(s) to Cloudinary. Your products and categories will stay the same — only the image links get updated. Continue?`)) return;
     setMigrating(true);
     let done = 0;
     try {
@@ -3790,7 +3783,7 @@ function ImageMigrationPanel({
       marginBottom: 16,
       maxWidth: 560
     }
-  }, `${pendingCount} image(s) are still stored the old way (or on an old project's storage) and may be making your site feel heavy or unsafe to clean up. Click below to move them into your current storage — nothing will be deleted, only the image links get updated.`), /*#__PURE__*/React.createElement("button", {
+  }, `${pendingCount} image(s) are still hosted on Supabase storage, which has a limited free quota. Click below to move them to Cloudinary (no egress limit) — nothing will be deleted, only the image links get updated.`), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary",
     onClick: runMigration,
     disabled: migrating
