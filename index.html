@@ -764,6 +764,7 @@ function rowToProduct(row) {
     fabric: row.fabric || '',
     subcategory: row.subcategory || '',
     sizes: Array.isArray(row.sizes) ? row.sizes : [],
+    stock: row.stock != null ? Number(row.stock) : null,
     images: images,
     featured: !!row.featured,
     rating: row.rating || 4
@@ -783,7 +784,8 @@ function productToRow(p) {
     featured: !!p.featured,
     fabric: p.fabric || null,
     subcategory: p.subcategory || null,
-    sizes: Array.isArray(p.sizes) ? p.sizes : []
+    sizes: Array.isArray(p.sizes) ? p.sizes : [],
+    stock: p.stock != null && p.stock !== '' ? Number(p.stock) : 0
   };
 }
 
@@ -1695,28 +1697,33 @@ function ProductCard({
   onQuickAdd
 }) {
   const onSale = p.originalPrice && p.originalPrice > p.price;
+  const outOfStock = p.stock === 0;
   return /*#__PURE__*/React.createElement("div", {
     className: "card",
     onClick: () => go('product', {
       id: p.id
     })
   }, /*#__PURE__*/React.createElement("div", {
-    className: "card-media"
+    className: "card-media",
+    style: outOfStock ? { opacity: 0.55 } : undefined
   }, /*#__PURE__*/React.createElement("img", {
     src: p.images[0],
     alt: p.name,
     loading: "lazy"
-  }), p.featured && /*#__PURE__*/React.createElement("span", {
+  }), p.featured && !outOfStock && /*#__PURE__*/React.createElement("span", {
     className: "tag"
-  }, "Featured"), onSale && /*#__PURE__*/React.createElement("span", {
+  }, "Featured"), onSale && !outOfStock && /*#__PURE__*/React.createElement("span", {
     className: "sale-badge"
-  }, "Sale"), /*#__PURE__*/React.createElement("button", {
+  }, "Sale"), outOfStock && /*#__PURE__*/React.createElement("span", {
+    className: "sale-badge",
+    style: { background: '#6b6660' }
+  }, "Out of Stock"), /*#__PURE__*/React.createElement("button", {
     className: "wishlist",
     onClick: e => e.stopPropagation(),
     "aria-label": "Add to wishlist"
   }, /*#__PURE__*/React.createElement(Icon.Heart, {
     size: 15
-  })), /*#__PURE__*/React.createElement("button", {
+  })), !outOfStock && /*#__PURE__*/React.createElement("button", {
     className: "card-quickadd",
     onClick: e => {
       e.stopPropagation();
@@ -2820,7 +2827,15 @@ function ProductDetail({
     style: {
       position: 'static'
     }
-  }, "Sale"))), /*#__PURE__*/React.createElement(DescriptionList, {
+  }, "Sale"))), (p.stock != null) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 20,
+      fontSize: 12.5,
+      fontWeight: 600,
+      letterSpacing: '0.03em',
+      color: p.stock > 0 ? (p.stock <= 5 ? '#c98a3e' : 'var(--brass)') : '#c1443f'
+    }
+  }, p.stock > 0 ? (p.stock <= 5 ? `Only ${p.stock} left in stock` : 'In Stock') : 'Out of Stock'), /*#__PURE__*/React.createElement(DescriptionList, {
     text: p.desc
   }), /*#__PURE__*/React.createElement(SizeChart, {
     category: p.category
@@ -2873,10 +2888,14 @@ function ProductDetail({
     className: "pd-actions"
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-outline",
-    onClick: handleAddToCart
-  }, "Add to Cart"), /*#__PURE__*/React.createElement("button", {
+    onClick: handleAddToCart,
+    disabled: p.stock === 0,
+    style: p.stock === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : undefined
+  }, p.stock === 0 ? 'Out of Stock' : "Add to Cart"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary",
-    onClick: handleBuyNow
+    onClick: handleBuyNow,
+    disabled: p.stock === 0,
+    style: p.stock === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : undefined
   }, "Buy Now")))), /*#__PURE__*/React.createElement(ReviewsSection, {
     productId: p.id,
     session: session,
@@ -3050,6 +3069,7 @@ function emptyProduct(categories) {
     fabric: '',
     subcategory: '',
     sizes: [],
+    stock: '',
     images: [],
     featured: false,
     rating: 5
@@ -3100,6 +3120,7 @@ function ProductForm({
       id: form.id || 'p_' + Date.now(),
       price: Number(form.price),
       originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
+      stock: form.stock !== '' && form.stock != null ? Number(form.stock) : 0,
       images: finalImages,
       sizes: finalSizes
     });
@@ -3190,6 +3211,19 @@ function ProductForm({
     onChange: e => setSizesText(e.target.value),
     placeholder: "e.g. Small, Medium, Large, X-Large"
   }))), /*#__PURE__*/React.createElement("div", {
+    className: "field-row"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", null, "Stock Quantity"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    value: form.stock,
+    onChange: e => setForm(f => ({
+      ...f,
+      stock: e.target.value
+    })),
+    placeholder: "e.g. 25"
+  })), /*#__PURE__*/React.createElement("div", null)), /*#__PURE__*/React.createElement("div", {
     className: "field"
   }, /*#__PURE__*/React.createElement("label", null, "Description"), /*#__PURE__*/React.createElement("textarea", {
     value: form.desc,
