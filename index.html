@@ -1999,7 +1999,7 @@ function Home({
     onClick: e => {
       e.preventDefault();
       go('shop', {
-        cat: 'all'
+        filter: 'featured'
       });
     }
   }, "View All →")), showcase.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -2030,7 +2030,7 @@ function Home({
       onClick: e => {
         e.preventDefault();
         go('shop', {
-          cat: 'all'
+          filter: sec.key
         });
       }
     }, "View All →")), /*#__PURE__*/React.createElement("div", {
@@ -2056,7 +2056,7 @@ function Home({
     onClick: e => {
       e.preventDefault();
       go('shop', {
-        cat: 'all'
+        filter: 'sale'
       });
     }
   }, "View All →")), /*#__PURE__*/React.createElement("div", {
@@ -2076,32 +2076,63 @@ function Shop({
   go,
   onQuickAdd,
   categories,
-  categorySubcategories
+  categorySubcategories,
+  homepageSections
 }) {
   const [cat, setCat] = useState(params?.cat || 'all');
   const [sub, setSub] = useState(params?.sub || 'all');
+  const [filterKey, setFilterKey] = useState(params?.filter || '');
   const [q, setQ] = useState('');
   useEffect(() => {
     setCat(params?.cat || 'all');
     setSub(params?.sub || 'all');
+    setFilterKey(params?.filter || '');
   }, [params]);
+  const filterLabel = useMemo(() => {
+    if (!filterKey) return null;
+    if (filterKey === 'sale') return 'On Sale';
+    if (filterKey === 'featured') return 'Featured';
+    const sec = (homepageSections || []).find(s => s.key === filterKey);
+    return sec ? sec.label : null;
+  }, [filterKey, homepageSections]);
+  const baseProducts = useMemo(() => {
+    if (!filterKey) return products;
+    if (filterKey === 'sale') return products.filter(p => p.originalPrice && p.originalPrice > p.price);
+    if (filterKey === 'featured') return products.filter(p => p.featured);
+    return products.filter(p => Array.isArray(p.homepageSections) && p.homepageSections.includes(filterKey));
+  }, [products, filterKey]);
   const subsForCat = (cat !== 'all' && categorySubcategories && categorySubcategories[cat]) || [];
   const showSubGrid = cat !== 'all' && sub === 'all' && subsForCat.length > 0 && q.trim() === '';
   const filtered = useMemo(() => {
-    return products.filter(p => {
+    return baseProducts.filter(p => {
       const catOk = cat === 'all' || p.category === cat;
       const subOk = sub === 'all' || sub === '__all_in_cat__' || p.subcategory === sub;
       const qOk = q.trim() === '' || p.name.toLowerCase().includes(q.toLowerCase()) || p.category.toLowerCase().includes(q.toLowerCase());
       return catOk && subOk && qOk;
     });
-  }, [products, cat, sub, q]);
+  }, [baseProducts, cat, sub, q]);
   return /*#__PURE__*/React.createElement("div", {
     className: "container section"
   }, /*#__PURE__*/React.createElement("div", {
     className: "section-head"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "eyebrow"
-  }, "Full Collection"), /*#__PURE__*/React.createElement("h2", null, sub !== 'all' ? sub : cat !== 'all' ? cat : 'Shop All'))), /*#__PURE__*/React.createElement("div", {
+  }, "Full Collection"), /*#__PURE__*/React.createElement("h2", null, filterLabel || (sub !== 'all' ? sub : cat !== 'all' ? cat : 'Shop All')), filterKey && /*#__PURE__*/React.createElement("a", {
+    href: "#",
+    onClick: e => {
+      e.preventDefault();
+      go('shop', {
+        cat: cat
+      });
+    },
+    style: {
+      fontSize: 12,
+      color: 'var(--sand-dim)',
+      textDecoration: 'underline',
+      display: 'inline-block',
+      marginTop: 8
+    }
+  }, "Show all products instead ✕"))), /*#__PURE__*/React.createElement("div", {
     className: "filter-bar"
   }, /*#__PURE__*/React.createElement("button", {
     className: `chip ${cat === 'all' ? 'active' : ''}`,
@@ -4816,6 +4847,7 @@ function buildUrl(route, params) {
     if (params.sub && params.sub !== 'all') usp.set('sub', params.sub);
     if (params.id) usp.set('id', params.id);
     if (params.page) usp.set('p', params.page);
+    if (params.filter) usp.set('filter', params.filter);
   }
   const qs = usp.toString();
   return qs ? '?' + qs : window.location.pathname;
@@ -4828,6 +4860,7 @@ function parseUrl() {
   if (usp.get('sub')) params.sub = usp.get('sub');
   if (usp.get('id')) params.id = usp.get('id');
   if (usp.get('p')) params.page = usp.get('p');
+  if (usp.get('filter')) params.filter = usp.get('filter');
   return {
     route,
     params
@@ -5096,7 +5129,8 @@ function App() {
     go: go,
     onQuickAdd: quickAdd,
     categories: categories,
-    categorySubcategories: categorySubcategories
+    categorySubcategories: categorySubcategories,
+    homepageSections: homepageSections
   }), route === 'product' && /*#__PURE__*/React.createElement(ProductDetail, {
     products: products,
     params: params,
