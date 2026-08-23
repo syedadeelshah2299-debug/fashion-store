@@ -434,6 +434,10 @@
   /* ---------- Checkout page ---------- */
   .checkout-wrap{ display:grid; grid-template-columns:1.3fr 1fr; gap:60px; padding:50px 0 100px; }
   @media (max-width:860px){ .checkout-wrap{ grid-template-columns:1fr; gap:36px; } }
+  .checkout-form-section{ border:1px solid var(--line); padding:26px 24px; margin-bottom:20px; }
+  .cfs-head{ display:flex; align-items:center; gap:12px; margin-bottom:22px; }
+  .cfs-icon{ width:38px; height:38px; border-radius:50%; background:rgba(176,141,87,0.1); color:var(--brass); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .cfs-head h3{ font-size:16px; font-weight:600; font-family:'Playfair Display',serif; }
   .checkout-summary{ border:1px solid var(--line); padding:26px; height:fit-content; }
   .checkout-summary h3{ font-size:17px; margin-bottom:20px; }
   .co-item{ display:flex; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
@@ -982,40 +986,73 @@ async function updateCategoryImage(name, image_url) {
   }
 }
 
-/* Loads a map of { categoryName: [subcategory, subcategory, ...] } */
+/* Loads a map of { categoryName: [{name, image_url}, ...] } from the dedicated subcategories table */
 async function loadCategorySubcategories() {
   if (!supabaseClient) return {};
   try {
     const {
       data,
       error
-    } = await supabaseClient.from('categories').select('name,subcategories').order('name', {
+    } = await supabaseClient.from('subcategories').select('*').order('name', {
       ascending: true
     });
     if (error) {
-      console.error('Supabase category subcategories load error:', error);
+      console.error('Supabase subcategories load error:', error);
       return {};
     }
     const map = {};
-    (data || []).forEach(c => {
-      map[c.name] = Array.isArray(c.subcategories) ? c.subcategories : [];
+    (data || []).forEach(row => {
+      if (!map[row.category]) map[row.category] = [];
+      map[row.category].push({
+        id: row.id,
+        name: row.name,
+        image_url: row.image_url || null
+      });
     });
     return map;
   } catch (e) {
-    console.error('Supabase category subcategories load exception:', e);
+    console.error('Supabase subcategories load exception:', e);
     return {};
   }
 }
 
-async function updateCategorySubcategories(name, subcategories) {
+async function insertSubcategoryRow(category, name, image_url) {
+  if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const {
+    data,
+    error
+  } = await supabaseClient.from('subcategories').insert([{
+    category,
+    name,
+    image_url: image_url || null
+  }]).select();
+  if (error) {
+    console.error('Supabase subcategory insert error:', error);
+    throw error;
+  }
+  return data && data[0] ? data[0] : null;
+}
+
+async function updateSubcategoryImageRow(id, image_url) {
   if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
   const {
     error
-  } = await supabaseClient.from('categories').update({
-    subcategories
-  }).eq('name', name);
+  } = await supabaseClient.from('subcategories').update({
+    image_url
+  }).eq('id', id);
   if (error) {
-    console.error('Supabase category subcategories update error:', error);
+    console.error('Supabase subcategory image update error:', error);
+    throw error;
+  }
+}
+
+async function deleteSubcategoryRow(id) {
+  if (!supabaseClient) throw new Error(supabaseInitError || 'Supabase not initialized');
+  const {
+    error
+  } = await supabaseClient.from('subcategories').delete().eq('id', id);
+  if (error) {
+    console.error('Supabase subcategory delete error:', error);
     throw error;
   }
 }
@@ -1330,16 +1367,16 @@ function Nav({
     className: "mega-all",
     onClick: e => {
       e.preventDefault();
-      navigate(cat);
+      navigate(cat, '__all_in_cat__');
     }
   }, "All ", cat), ((categorySubcategories && categorySubcategories[cat]) || []).map(sub => /*#__PURE__*/React.createElement("a", {
-    key: sub,
+    key: sub.id || sub.name,
     href: "#",
     onClick: e => {
       e.preventDefault();
-      navigate(cat, sub);
+      navigate(cat, sub.name);
     }
-  }, sub)))))), /*#__PURE__*/React.createElement("div", {
+  }, sub.name)))))), /*#__PURE__*/React.createElement("div", {
     className: "nav-right"
   }, /*#__PURE__*/React.createElement("button", {
     className: "icon-btn",
@@ -1427,18 +1464,18 @@ function Nav({
       marginBottom: 6
     }
   }, ((categorySubcategories && categorySubcategories[cat]) || []).map(sub => /*#__PURE__*/React.createElement("a", {
-    key: sub,
+    key: sub.id || sub.name,
     href: "#",
     onClick: e => {
       e.preventDefault();
-      navigate(cat, sub);
+      navigate(cat, sub.name);
     },
     style: {
       padding: '8px 0',
       fontSize: 13,
       color: 'var(--sand-dim)'
     }
-  }, sub)))))));
+  }, sub.name)))))));
 }
 
 /* ---------------- Hero ---------------- */
@@ -2003,10 +2040,11 @@ function Shop({
     setSub(params?.sub || 'all');
   }, [params]);
   const subsForCat = (cat !== 'all' && categorySubcategories && categorySubcategories[cat]) || [];
+  const showSubGrid = cat !== 'all' && sub === 'all' && subsForCat.length > 0 && q.trim() === '';
   const filtered = useMemo(() => {
     return products.filter(p => {
       const catOk = cat === 'all' || p.category === cat;
-      const subOk = sub === 'all' || p.subcategory === sub;
+      const subOk = sub === 'all' || sub === '__all_in_cat__' || p.subcategory === sub;
       const qOk = q.trim() === '' || p.name.toLowerCase().includes(q.toLowerCase()) || p.category.toLowerCase().includes(q.toLowerCase());
       return catOk && subOk && qOk;
     });
@@ -2017,7 +2055,7 @@ function Shop({
     className: "section-head"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "eyebrow"
-  }, "Full Collection"), /*#__PURE__*/React.createElement("h2", null, sub !== 'all' ? sub : 'Shop All'))), /*#__PURE__*/React.createElement("div", {
+  }, "Full Collection"), /*#__PURE__*/React.createElement("h2", null, sub !== 'all' ? sub : cat !== 'all' ? cat : 'Shop All'))), /*#__PURE__*/React.createElement("div", {
     className: "filter-bar"
   }, /*#__PURE__*/React.createElement("button", {
     className: `chip ${cat === 'all' ? 'active' : ''}`,
@@ -2037,17 +2075,40 @@ function Shop({
     placeholder: "Search products...",
     value: q,
     onChange: e => setQ(e.target.value)
-  })), subsForCat.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), showSubGrid ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "subcat-grid",
+    style: {
+      marginBottom: 30
+    }
+  }, subsForCat.map(s => /*#__PURE__*/React.createElement("div", {
+    className: "subcat-card",
+    key: s.id || s.name,
+    onClick: () => setSub(s.name)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "subcat-media"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: s.image_url || placeholderImg(s.name, 300, 300),
+    alt: s.name,
+    loading: "lazy"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "subcat-label"
+  }, s.name)))), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-outline",
+    style: {
+      marginBottom: 30
+    },
+    onClick: () => setSub('__all_in_cat__')
+  }, "View All in ", cat)) : /*#__PURE__*/React.createElement(React.Fragment, null, cat !== 'all' && subsForCat.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "filter-bar",
     style: { marginTop: -20 }
   }, /*#__PURE__*/React.createElement("button", {
-    className: `chip ${sub === 'all' ? 'active' : ''}`,
-    onClick: () => setSub('all')
+    className: `chip ${sub === '__all_in_cat__' ? 'active' : ''}`,
+    onClick: () => setSub('__all_in_cat__')
   }, "All ", cat), subsForCat.map(s => /*#__PURE__*/React.createElement("button", {
-    key: s,
-    className: `chip ${sub === s ? 'active' : ''}`,
-    onClick: () => setSub(s)
-  }, s))), sub !== 'all' && /*#__PURE__*/React.createElement("div", {
+    key: s.id || s.name,
+    className: `chip ${sub === s.name ? 'active' : ''}`,
+    onClick: () => setSub(s.name)
+  }, s.name))), sub !== 'all' && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 24,
       fontSize: 12.5,
@@ -2057,14 +2118,14 @@ function Shop({
     style: {
       color: 'var(--brass)'
     }
-  }, sub), /*#__PURE__*/React.createElement("button", {
+  }, sub === '__all_in_cat__' ? `All ${cat}` : sub), /*#__PURE__*/React.createElement("button", {
     onClick: () => setSub('all'),
     style: {
       marginLeft: 10,
       color: 'var(--maroon)',
       textDecoration: 'underline'
     }
-  }, "Clear")), filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "Change")), filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("h3", null, "No products found"), /*#__PURE__*/React.createElement("p", null, "Try a different filter or search term.")) : /*#__PURE__*/React.createElement("div", {
     className: "grid"
@@ -2073,7 +2134,7 @@ function Shop({
     p: p,
     go: go,
     onQuickAdd: onQuickAdd
-  }))));
+  })))));
 }
 
 /* ---------------- Checkout ---------------- */
@@ -2378,6 +2439,14 @@ function Checkout({
   }, "Delivery Details"), /*#__PURE__*/React.createElement("form", {
     onSubmit: placeOrder
   }, /*#__PURE__*/React.createElement("div", {
+    className: "checkout-form-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cfs-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "cfs-icon"
+  }, /*#__PURE__*/React.createElement(Icon.User, {
+    size: 18
+  })), /*#__PURE__*/React.createElement("h3", null, "Customer Contact Details")), /*#__PURE__*/React.createElement("div", {
     className: "field"
   }, /*#__PURE__*/React.createElement("label", null, "Full Name"), /*#__PURE__*/React.createElement("input", {
     value: form.name,
@@ -2388,7 +2457,10 @@ function Checkout({
     placeholder: "Your full name",
     required: true
   })), /*#__PURE__*/React.createElement("div", {
-    className: "field"
+    className: "field",
+    style: {
+      marginBottom: 0
+    }
   }, /*#__PURE__*/React.createElement("label", null, "Phone Number"), /*#__PURE__*/React.createElement("input", {
     type: "tel",
     value: form.phone,
@@ -2398,7 +2470,15 @@ function Checkout({
     })),
     placeholder: "03XX-XXXXXXX",
     required: true
-  })), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "checkout-form-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cfs-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "cfs-icon"
+  }, /*#__PURE__*/React.createElement(Icon.Truck, {
+    size: 18
+  })), /*#__PURE__*/React.createElement("h3", null, "Address & Delivery Details")), /*#__PURE__*/React.createElement("div", {
     className: "field"
   }, /*#__PURE__*/React.createElement("label", null, "Delivery Address"), /*#__PURE__*/React.createElement("textarea", {
     value: form.address,
@@ -2409,7 +2489,10 @@ function Checkout({
     placeholder: "House/street, area, landmark",
     required: true
   })), /*#__PURE__*/React.createElement("div", {
-    className: "field"
+    className: "field",
+    style: {
+      marginBottom: 0
+    }
   }, /*#__PURE__*/React.createElement("label", null, "City"), /*#__PURE__*/React.createElement("input", {
     value: form.city,
     onChange: e => setForm(f => ({
@@ -2418,7 +2501,30 @@ function Checkout({
     })),
     placeholder: "e.g. Lahore",
     required: true
-  })), /*#__PURE__*/React.createElement("button", {
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "checkout-form-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cfs-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "cfs-icon"
+  }, /*#__PURE__*/React.createElement(Icon.Card, {
+    size: 18
+  })), /*#__PURE__*/React.createElement("h3", null, "Payment Method")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      border: '1px solid var(--brass)',
+      background: 'rgba(176,141,87,0.06)',
+      padding: '14px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      fontSize: 13.5
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--brass)',
+      fontSize: 16
+    }
+  }, "✓"), "Cash on Delivery — pay when your order arrives")), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary",
     type: "submit",
     style: {
@@ -2440,7 +2546,7 @@ function Checkout({
       marginTop: 14,
       textAlign: 'center'
     }
-  }, "Cash on Delivery — no payment needed now. We'll contact you to confirm delivery details."))), /*#__PURE__*/React.createElement("div", {
+  }, "We'll contact you to confirm delivery details."))), /*#__PURE__*/React.createElement("div", {
     className: "checkout-summary"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "serif"
@@ -3198,9 +3304,9 @@ function ProductForm({
     value: form.subcategory || '',
     onChange: e => setForm(f => ({ ...f, subcategory: e.target.value }))
   }, /*#__PURE__*/React.createElement("option", { value: "" }, "— None —"), availableSubs.map(s => /*#__PURE__*/React.createElement("option", {
-    key: s,
-    value: s
-  }, s))) : /*#__PURE__*/React.createElement("input", {
+    key: s.id || s.name,
+    value: s.name
+  }, s.name))) : /*#__PURE__*/React.createElement("input", {
     value: form.subcategory || '',
     onChange: e => setForm(f => ({ ...f, subcategory: e.target.value })),
     placeholder: "This category has no subcategories yet — add some in Manage Categories below"
@@ -3322,9 +3428,15 @@ function CategoryManager({
   const [uploadingEdit, setUploadingEdit] = useState(false);
   const [expandedCat, setExpandedCat] = useState(null);
   const [newSubText, setNewSubText] = useState('');
+  const [newSubImage, setNewSubImage] = useState('');
+  const [uploadingNewSub, setUploadingNewSub] = useState(false);
   const [savingSub, setSavingSub] = useState(false);
+  const [editingSubId, setEditingSubId] = useState(null);
+  const [uploadingSubImage, setUploadingSubImage] = useState(false);
   const newFileRef = useRef(null);
   const editFileRef = useRef(null);
+  const subNewFileRef = useRef(null);
+  const subEditFileRef = useRef(null);
   const handleAdd = async e => {
     e.preventDefault();
     const name = newCat.trim();
@@ -3372,31 +3484,44 @@ function CategoryManager({
     const name = newSubText.trim();
     if (!name) return;
     const existing = (categorySubcategories && categorySubcategories[catName]) || [];
-    if (existing.some(s => s.toLowerCase() === name.toLowerCase())) {
+    if (existing.some(s => s.name.toLowerCase() === name.toLowerCase())) {
       fireToast('Subcategory already exists');
       return;
     }
     setSavingSub(true);
     try {
-      await updateCategorySubcategories(catName, [...existing, name]);
+      await insertSubcategoryRow(catName, name, newSubImage || null);
       await refreshCategories();
       setNewSubText('');
+      setNewSubImage('');
       fireToast('Subcategory added');
     } catch (e) {
       fireToast('Error adding subcategory');
     }
     setSavingSub(false);
   };
-  const handleRemoveSub = async (catName, subName) => {
-    if (!window.confirm(`Remove subcategory "${subName}" from ${catName}?`)) return;
-    const existing = (categorySubcategories && categorySubcategories[catName]) || [];
+  const handleRemoveSub = async (catName, sub) => {
+    if (!window.confirm(`Remove subcategory "${sub.name}" from ${catName}?`)) return;
     try {
-      await updateCategorySubcategories(catName, existing.filter(s => s !== subName));
+      await deleteSubcategoryRow(sub.id);
       await refreshCategories();
       fireToast('Subcategory removed');
     } catch (e) {
       fireToast('Error removing subcategory');
     }
+  };
+  const handleSubImageChange = async (sub, file) => {
+    setUploadingSubImage(true);
+    try {
+      const url = await uploadImageToBucket(file);
+      await updateSubcategoryImageRow(sub.id, url);
+      await refreshCategories();
+      fireToast('Subcategory image updated');
+    } catch (e) {
+      console.error('Subcategory image upload failed:', e);
+      fireToast('Error updating image');
+    }
+    setUploadingSubImage(false);
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "admin-panel-box"
@@ -3562,31 +3687,76 @@ function CategoryManager({
       style: {
         display: 'flex',
         flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: 14
+        gap: 12,
+        marginBottom: 16
       }
-    }, subs.map(s => /*#__PURE__*/React.createElement("span", {
-      key: s,
-      style: {
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        border: '1px solid var(--line)',
-        padding: '6px 6px 6px 12px',
-        fontSize: 12.5
-      }
-    }, s, /*#__PURE__*/React.createElement("button", {
-      onClick: () => handleRemoveSub(cat, s),
-      "aria-label": `Remove ${s}`,
-      style: {
-        color: 'var(--maroon-light)',
-        fontSize: 13,
-        padding: '2px 4px'
-      }
-    }, "✕")))), /*#__PURE__*/React.createElement("div", {
+    }, subs.map(s => /*#__PURE__*/React.createElement("div", {
+      key: s.id,
       style: {
         display: 'flex',
-        gap: 10
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 6,
+        width: 72
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'relative',
+        width: 56,
+        height: 56,
+        borderRadius: 6,
+        overflow: 'hidden',
+        background: 'var(--sand)',
+        cursor: uploadingSubImage ? 'default' : 'pointer',
+        border: '1px solid var(--line)',
+        opacity: uploadingSubImage && editingSubId === s.id ? 0.5 : 1
+      },
+      onClick: () => {
+        if (uploadingSubImage) return;
+        setEditingSubId(s.id);
+        subEditFileRef.current.value = '';
+        subEditFileRef.current.click();
+      },
+      title: "Tap to change image"
+    }, /*#__PURE__*/React.createElement("img", {
+      src: s.image_url || placeholderImg(s.name, 120, 120),
+      style: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover'
+      }
+    }), uploadingSubImage && editingSubId === s.id && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(21,19,15,0.55)',
+        color: '#fff',
+        fontSize: 8
+      }
+    }, "…")), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        textAlign: 'center',
+        lineHeight: 1.25
+      }
+    }, s.name), /*#__PURE__*/React.createElement("button", {
+      onClick: () => handleRemoveSub(cat, s),
+      "aria-label": `Remove ${s.name}`,
+      style: {
+        color: 'var(--maroon-light)',
+        fontSize: 10.5,
+        textTransform: 'uppercase',
+        letterSpacing: '0.03em'
+      }
+    }, "Remove")))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        flexWrap: 'wrap',
+        alignItems: 'center'
       }
     }, /*#__PURE__*/React.createElement("input", {
       value: newSubText,
@@ -3600,13 +3770,32 @@ function CategoryManager({
       placeholder: "e.g. Lawn, Fancy, 2 Piece",
       style: {
         flex: 1,
+        minWidth: 140,
         background: 'rgba(42,39,36,0.03)',
         border: '1px solid var(--line)',
         color: 'var(--ivory)',
         padding: '10px 12px',
         fontSize: 13
       }
-    }), /*#__PURE__*/React.createElement("button", {
+    }), newSubImage && /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 32,
+        height: 32,
+        borderRadius: 4,
+        overflow: 'hidden',
+        border: '1px solid var(--line)',
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: newSubImage,
+      style: { width: '100%', height: '100%', objectFit: 'cover' }
+    })), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-outline",
+      disabled: uploadingNewSub,
+      onClick: () => subNewFileRef.current.click(),
+      style: { fontSize: 11, padding: '10px 14px' }
+    }, uploadingNewSub ? 'Uploading…' : newSubImage ? 'Image ✓' : 'Add Image'), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-outline",
       disabled: savingSub,
@@ -3621,6 +3810,38 @@ function CategoryManager({
     },
     onChange: e => {
       if (e.target.files[0] && editingCat) handleImageChange(editingCat, e.target.files[0]);
+      e.target.value = '';
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    ref: subNewFileRef,
+    type: "file",
+    accept: "image/*",
+    style: { display: 'none' },
+    onChange: async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setUploadingNewSub(true);
+      try {
+        const url = await uploadImageToBucket(file);
+        setNewSubImage(url);
+      } catch (err) {
+        console.error('Subcategory image upload failed:', err);
+        fireToast('Error uploading image');
+      }
+      setUploadingNewSub(false);
+      e.target.value = '';
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    ref: subEditFileRef,
+    type: "file",
+    accept: "image/*",
+    style: { display: 'none' },
+    onChange: e => {
+      if (e.target.files[0] && editingSubId != null) {
+        const allSubs = Object.values(categorySubcategories || {}).flat();
+        const subObj = allSubs.find(x => x.id === editingSubId);
+        if (subObj) handleSubImageChange(subObj, e.target.files[0]);
+      }
       e.target.value = '';
     }
   }));
@@ -4293,7 +4514,7 @@ function App() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [categoryImages, setCategoryImages] = useState({});
-  const [categorySubcategories, setCategorySubcategories] = useState(SUBCATEGORIES);
+  const [categorySubcategories, setCategorySubcategories] = useState({});
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [loading, setLoading] = useState(true);
