@@ -570,6 +570,9 @@
   /* ---------- Top Subcategories ---------- */
   .subcat-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px 14px; }
   @media (max-width:700px){ .subcat-grid{ gap:12px 10px; } }
+  .shop-subcat-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:20px 16px; }
+  @media (max-width:700px){ .shop-subcat-grid{ gap:14px 12px; } }
+  @media (max-width:560px){ .shop-subcat-grid{ gap:12px 10px; } }
   .subcat-card{
     cursor:pointer; text-align:center;
     transition:transform .3s cubic-bezier(.2,.8,.2,1);
@@ -2271,7 +2274,7 @@ function Shop({
     value: q,
     onChange: e => setQ(e.target.value)
   })), showSubGrid ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "subcat-grid",
+    className: "shop-subcat-grid",
     style: {
       marginBottom: 30
     }
