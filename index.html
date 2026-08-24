@@ -360,6 +360,20 @@
     aspect-ratio:4/5; background:var(--sand); overflow:hidden; perspective:1200px; border-radius:2px;
   }
   .pd-media img{ width:100%; height:100%; object-fit:cover; object-position:top; }
+  .pd-media-carousel{
+    display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
+    scrollbar-width:none; border-radius:2px;
+  }
+  .pd-media-carousel::-webkit-scrollbar{ display:none; }
+  .pd-media-carousel .pd-media{
+    flex:0 0 100%; scroll-snap-align:center; scroll-snap-stop:always; border-radius:0;
+  }
+  .pd-dots{ display:flex; justify-content:center; align-items:center; gap:7px; margin-top:14px; }
+  .pd-dot{
+    width:7px; height:7px; border-radius:50%; background:var(--line); border:none; padding:0;
+    cursor:pointer; transition:all .25s cubic-bezier(.2,.8,.2,1); flex-shrink:0;
+  }
+  .pd-dot.active{ width:22px; border-radius:4px; background:var(--brass); }
   .pd-info .eyebrow{ margin-bottom:10px; }
   .pd-info h1{ font-size:clamp(28px,4vw,42px); margin-bottom:14px; }
   .pd-price{ font-size:22px; color:var(--brass); font-weight:600; margin-bottom:24px; }
@@ -394,6 +408,27 @@
     .size-chart-table th, .size-chart-table td{ padding:8px 8px; }
     .size-chart-table th{ font-size:9.5px; }
   }
+
+  /* ---------- Tag picker (colors / sizes chooser) ---------- */
+  .tag-picker-grid{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; max-height:220px; overflow-y:auto; padding:2px; }
+  .tag-swatch{
+    display:flex; align-items:center; gap:7px; padding:8px 13px; border:1px solid var(--line);
+    background:rgba(42,39,36,0.02); font-size:12.5px; color:var(--ivory); transition:all .15s; white-space:nowrap;
+  }
+  .tag-swatch:hover{ border-color:var(--brass); }
+  .tag-swatch.active{ border-color:var(--brass); background:rgba(176,141,87,0.1); color:var(--brass); font-weight:600; }
+  .swatch-dot{ width:14px; height:14px; border-radius:50%; border:1px solid rgba(0,0,0,0.15); flex-shrink:0; }
+  .tag-chip-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .tag-chip{
+    display:flex; align-items:center; gap:7px; border:1px solid var(--brass); background:rgba(176,141,87,0.08);
+    color:var(--brass); padding:6px 11px; font-size:12px; font-weight:600;
+  }
+  .tag-chip button{ color:var(--maroon-light); font-size:11px; line-height:1; }
+  .pd-option-btn{
+    padding:9px 16px; border:1px solid var(--line); font-size:12.5px; letter-spacing:0.03em; background:transparent;
+    display:flex; align-items:center; gap:8px; color:var(--ivory);
+  }
+  .pd-option-btn.active{ border-color:var(--brass); color:var(--brass); background:rgba(176,141,87,0.08); }
 
   /* ---------- Reviews ---------- */
   .reviews-section{ margin-top:60px; border-top:1px solid var(--line); padding-top:40px; }
@@ -553,17 +588,6 @@
     .subcat-card{ border-radius:10px; padding:10px 8px 12px; }
     .subcat-media{ border-radius:7px; }
     .subcat-label{ font-size:12px; margin-top:9px; line-height:1.3; }
-  }
-  /* Homepage "Top Categories" keeps the original smaller 4-per-row layout */
-  .top-cat-grid{ grid-template-columns:repeat(4, 1fr); gap:14px 10px; }
-  .top-cat-grid .subcat-card{ padding:7px 6px 10px; }
-  .top-cat-grid .subcat-label{ font-size:10.5px; margin-top:7px; line-height:1.25; }
-  @media (max-width:700px){ .top-cat-grid{ grid-template-columns:repeat(4, 1fr); gap:10px 8px; } }
-  @media (max-width:560px){
-    .top-cat-grid{ grid-template-columns:repeat(4, 1fr); gap:8px 6px; }
-    .top-cat-grid .subcat-card{ border-radius:8px; padding:6px 5px 8px; }
-    .top-cat-grid .subcat-media{ border-radius:5px; }
-    .top-cat-grid .subcat-label{ font-size:9.5px; margin-top:6px; line-height:1.2; }
   }
 </style>
 </head>
@@ -788,6 +812,7 @@ function rowToProduct(row) {
     fabric: row.fabric || '',
     subcategory: row.subcategory || '',
     sizes: Array.isArray(row.sizes) ? row.sizes : [],
+    colors: Array.isArray(row.colors) ? row.colors : [],
     stock: row.stock != null ? Number(row.stock) : null,
     images: images,
     featured: !!row.featured,
@@ -824,6 +849,7 @@ function productToRow(p) {
     fabric: p.fabric || null,
     subcategory: p.subcategory || null,
     sizes: Array.isArray(p.sizes) ? p.sizes : [],
+    colors: Array.isArray(p.colors) ? p.colors : [],
     stock: p.stock != null && p.stock !== '' ? Number(p.stock) : 0
   };
 }
@@ -1347,7 +1373,7 @@ async function mergeCartsOnLogin(userId, localCart) {
   const remoteCart = await loadCart(userId);
   const merged = [...remoteCart];
   localCart.forEach(localItem => {
-    const existing = merged.find(x => x.id === localItem.id && (x.size || '') === (localItem.size || ''));
+    const existing = merged.find(x => x.id === localItem.id && (x.size || '') === (localItem.size || '') && (x.color || '') === (localItem.color || ''));
     if (existing) {
       existing.qty += localItem.qty;
     } else {
@@ -2035,7 +2061,7 @@ function TopSubcategories({
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "eyebrow"
   }, "Explore"), /*#__PURE__*/React.createElement("h2", null, "Top Categories"))), /*#__PURE__*/React.createElement("div", {
-    className: "subcat-grid top-cat-grid"
+    className: "subcat-grid"
   }, categories.map(cat => {
     const img = categoryImages && categoryImages[cat] || placeholderImg(cat, 300, 300);
     return /*#__PURE__*/React.createElement("div", {
@@ -2552,7 +2578,8 @@ function Checkout({
           name: x.product.name,
           qty: x.qty,
           price: x.product.price,
-          size: x.size || ''
+          size: x.size || '',
+          color: x.color || ''
         })),
         customer_name: form.name.trim(),
         phone: form.phone.trim(),
@@ -2736,12 +2763,12 @@ function Checkout({
     className: "serif"
   }, "Order Summary"), items.map(x => /*#__PURE__*/React.createElement("div", {
     className: "co-item",
-    key: x.id + '-' + (x.size || '')
+    key: x.id + '-' + (x.size || '') + '-' + (x.color || '')
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "co-name"
   }, x.product.name), /*#__PURE__*/React.createElement("div", {
     className: "co-qty"
-  }, "Qty ", x.qty, x.size ? ` · Size: ${x.size}` : '')), /*#__PURE__*/React.createElement("div", null, "Rs. ", (x.product.price * x.qty).toLocaleString()))), /*#__PURE__*/React.createElement("div", {
+  }, "Qty ", x.qty, x.size ? ` · Size: ${x.size}` : '', x.color ? ` · Color: ${x.color}` : '')), /*#__PURE__*/React.createElement("div", null, "Rs. ", (x.product.price * x.qty).toLocaleString()))), /*#__PURE__*/React.createElement("div", {
     className: "co-item"
   }, /*#__PURE__*/React.createElement("span", null, "Subtotal"), /*#__PURE__*/React.createElement("span", null, "Rs. ", subtotal.toLocaleString())), /*#__PURE__*/React.createElement("div", {
     className: "co-item"
@@ -3008,20 +3035,45 @@ function ProductDetail({
   const [activeImg, setActiveImg] = useState(0);
   const [selectedSize, setSelectedSize] = useState('');
   const [sizeErr, setSizeErr] = useState(false);
+  const [selectedColor, setSelectedColor] = useState('');
+  const [colorErr, setColorErr] = useState(false);
+  const mediaRef = useRef(null);
   useEffect(() => {
     setQty(1);
     setActiveImg(0);
     setSelectedSize('');
     setSizeErr(false);
+    setSelectedColor('');
+    setColorErr(false);
+    if (mediaRef.current) mediaRef.current.scrollTo({
+      left: 0
+    });
   }, [params]);
+  const handleMediaScroll = () => {
+    const el = mediaRef.current;
+    if (!el || !el.clientWidth) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    setActiveImg(cur => cur === idx ? cur : idx);
+  };
+  const scrollToImg = i => {
+    const el = mediaRef.current;
+    if (el) el.scrollTo({
+      left: i * el.clientWidth,
+      behavior: 'smooth'
+    });
+    setActiveImg(i);
+  };
   const needsSize = p && Array.isArray(p.sizes) && p.sizes.length > 0;
+  const needsColor = p && Array.isArray(p.colors) && p.colors.length > 0;
   const handleAddToCart = () => {
     if (needsSize && !selectedSize) { setSizeErr(true); return; }
-    onAddToCart(p, qty, selectedSize);
+    if (needsColor && !selectedColor) { setColorErr(true); return; }
+    onAddToCart(p, qty, selectedSize, selectedColor);
   };
   const handleBuyNow = () => {
     if (needsSize && !selectedSize) { setSizeErr(true); return; }
-    onBuyNow(p, qty, selectedSize);
+    if (needsColor && !selectedColor) { setColorErr(true); return; }
+    onBuyNow(p, qty, selectedSize, selectedColor);
   };
   if (!p) return /*#__PURE__*/React.createElement("div", {
     className: "container section"
@@ -3051,35 +3103,24 @@ function ProductDetail({
   }, "← Back to shop"), /*#__PURE__*/React.createElement("div", {
     className: "pd-wrap"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "pd-media"
-  }, /*#__PURE__*/React.createElement("img", {
-    src: p.images[activeImg],
-    alt: p.name
-  })), p.images.length > 1 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 10,
-      marginTop: 12
-    }
+    className: "pd-media-carousel",
+    ref: mediaRef,
+    onScroll: handleMediaScroll
   }, p.images.map((img, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    onClick: () => setActiveImg(i),
-    style: {
-      width: 64,
-      height: 80,
-      cursor: 'pointer',
-      opacity: i === activeImg ? 1 : 0.5,
-      border: i === activeImg ? '1px solid var(--brass)' : '1px solid transparent'
-    }
+    className: "pd-media",
+    key: i
   }, /*#__PURE__*/React.createElement("img", {
     src: img,
-    style: {
-      width: '100%',
-      height: '100%',
-      objectFit: 'cover',
-      objectPosition: 'top'
-    }
-  }))))), /*#__PURE__*/React.createElement("div", {
+    alt: p.name + ' ' + (i + 1)
+  })))), p.images.length > 1 && /*#__PURE__*/React.createElement("div", {
+    className: "pd-dots"
+  }, p.images.map((img, i) => /*#__PURE__*/React.createElement("button", {
+    key: i,
+    type: "button",
+    "aria-label": `View image ${i + 1}`,
+    className: `pd-dot ${i === activeImg ? 'active' : ''}`,
+    onClick: () => scrollToImg(i)
+  })))), /*#__PURE__*/React.createElement("div", {
     className: "pd-info"
   }, /*#__PURE__*/React.createElement("span", {
     className: "eyebrow"
@@ -3150,7 +3191,27 @@ function ProductDetail({
   }, s))), sizeErr && /*#__PURE__*/React.createElement("div", {
     className: "admin-error",
     style: { marginTop: 8 }
-  }, "Please select a size before continuing.")), /*#__PURE__*/React.createElement("div", {
+  }, "Please select a size before continuing.")), needsColor && /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 26 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--sand-dim)', marginBottom: 10 }
+  }, "Select Color"), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, flexWrap: 'wrap' }
+  }, p.colors.map(c => {
+    const swatch = (COLOR_OPTIONS.find(o => o.name === c) || {}).hex;
+    return /*#__PURE__*/React.createElement("button", {
+      key: c,
+      type: "button",
+      className: `pd-option-btn ${selectedColor === c ? 'active' : ''}`,
+      onClick: () => { setSelectedColor(c); setColorErr(false); }
+    }, swatch && /*#__PURE__*/React.createElement("span", {
+      className: "swatch-dot",
+      style: { background: swatch }
+    }), c);
+  })), colorErr && /*#__PURE__*/React.createElement("div", {
+    className: "admin-error",
+    style: { marginTop: 8 }
+  }, "Please select a color before continuing.")), /*#__PURE__*/React.createElement("div", {
     className: "pd-meta-row"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "k"
@@ -3234,7 +3295,7 @@ function CartDrawer({
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("h3", null, "Your bag is empty"), /*#__PURE__*/React.createElement("p", null, "Add something beautiful.")) : items.map(x => /*#__PURE__*/React.createElement("div", {
     className: "cart-item",
-    key: x.id + '-' + (x.size || '')
+    key: x.id + '-' + (x.size || '') + '-' + (x.color || '')
   }, /*#__PURE__*/React.createElement("img", {
     src: x.product.images[0],
     alt: x.product.name
@@ -3244,17 +3305,17 @@ function CartDrawer({
     className: "ci-name serif"
   }, x.product.name), /*#__PURE__*/React.createElement("div", {
     className: "ci-meta"
-  }, x.product.category + (x.size ? (' · Size: ' + x.size) : '')), /*#__PURE__*/React.createElement("div", {
+  }, x.product.category + (x.size ? (' · Size: ' + x.size) : '') + (x.color ? (' · Color: ' + x.color) : '')), /*#__PURE__*/React.createElement("div", {
     className: "ci-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "qty-box"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => updateQty(x.id, x.size, Math.max(1, x.qty - 1))
+    onClick: () => updateQty(x.id, x.size, x.color, Math.max(1, x.qty - 1))
   }, "−"), /*#__PURE__*/React.createElement("span", null, x.qty), /*#__PURE__*/React.createElement("button", {
-    onClick: () => updateQty(x.id, x.size, x.qty + 1)
+    onClick: () => updateQty(x.id, x.size, x.color, x.qty + 1)
   }, "+")), /*#__PURE__*/React.createElement("button", {
     className: "ci-remove",
-    onClick: () => removeItem(x.id, x.size)
+    onClick: () => removeItem(x.id, x.size, x.color)
   }, "Remove")))))), items.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "drawer-foot"
   }, /*#__PURE__*/React.createElement("div", {
@@ -3348,6 +3409,203 @@ function AdminLogin({
 }
 
 /* ---------------- Admin: Product Form ---------------- */
+const COLOR_OPTIONS = [{
+  name: 'Black',
+  hex: '#15130F'
+}, {
+  name: 'White',
+  hex: '#FFFFFF'
+}, {
+  name: 'Ivory',
+  hex: '#F3EDE3'
+}, {
+  name: 'Cream',
+  hex: '#F1E6C9'
+}, {
+  name: 'Beige',
+  hex: '#D8C7A8'
+}, {
+  name: 'Grey',
+  hex: '#8A8680'
+}, {
+  name: 'Charcoal',
+  hex: '#3A3630'
+}, {
+  name: 'Navy',
+  hex: '#1B2A4A'
+}, {
+  name: 'Blue',
+  hex: '#3B6EA5'
+}, {
+  name: 'Sky Blue',
+  hex: '#8FC1E3'
+}, {
+  name: 'Turquoise',
+  hex: '#3FB6A8'
+}, {
+  name: 'Teal',
+  hex: '#1F6F6B'
+}, {
+  name: 'Green',
+  hex: '#4A7A45'
+}, {
+  name: 'Olive',
+  hex: '#6B6B33'
+}, {
+  name: 'Mint',
+  hex: '#A9D8C6'
+}, {
+  name: 'Yellow',
+  hex: '#E8C94A'
+}, {
+  name: 'Mustard',
+  hex: '#C9A227'
+}, {
+  name: 'Orange',
+  hex: '#D97B3F'
+}, {
+  name: 'Peach',
+  hex: '#F0B69B'
+}, {
+  name: 'Coral',
+  hex: '#E0705A'
+}, {
+  name: 'Red',
+  hex: '#B33A3A'
+}, {
+  name: 'Maroon',
+  hex: '#6E2A32'
+}, {
+  name: 'Wine',
+  hex: '#5C2233'
+}, {
+  name: 'Pink',
+  hex: '#E3A6B8'
+}, {
+  name: 'Hot Pink',
+  hex: '#D6437D'
+}, {
+  name: 'Rose Gold',
+  hex: '#B76E79'
+}, {
+  name: 'Purple',
+  hex: '#6B4E8E'
+}, {
+  name: 'Lavender',
+  hex: '#C7B7E0'
+}, {
+  name: 'Brown',
+  hex: '#6B4A32'
+}, {
+  name: 'Tan',
+  hex: '#C6A277'
+}, {
+  name: 'Gold',
+  hex: '#B08D57'
+}, {
+  name: 'Silver',
+  hex: '#C7C7C7'
+}, {
+  name: 'Multicolor',
+  hex: 'linear-gradient(90deg,#e0335e,#f2843b,#e8d23c,#3fb673,#3b8fd6,#8a5cd6)'
+}];
+const SIZE_OPTIONS = ['Free Size', 'XS', 'Small', 'Medium', 'Large', 'X-Large', 'XX-Large', 'XXX-Large'];
+
+/* Reusable tap-to-choose picker used for both Colors and Sizes on the admin product form.
+   options: array of strings (sizes) OR array of {name, hex} (colors, when colorMode is true).
+   value/onChange: the selected list (array of strings) on the product. */
+function TagPicker({
+  label,
+  options,
+  colorMode,
+  value,
+  onChange,
+  placeholder
+}) {
+  const [open, setOpen] = useState(false);
+  const [manualText, setManualText] = useState('');
+  const selected = Array.isArray(value) ? value : [];
+  const swatchFor = name => colorMode ? (options.find(o => o.name === name) || {}).hex : null;
+  const toggleOption = opt => {
+    const name = colorMode ? opt.name : opt;
+    if (selected.includes(name)) onChange(selected.filter(v => v !== name));else onChange([...selected, name]);
+  };
+  const addManual = () => {
+    const v = manualText.trim();
+    if (!v) return;
+    if (!selected.includes(v)) onChange([...selected, v]);
+    setManualText('');
+  };
+  const removeTag = v => onChange(selected.filter(x => x !== v));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", null, label), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "size-chart-toggle",
+    onClick: () => setOpen(o => !o)
+  }, (open ? 'Hide' : 'Choose') + ' ' + label, " ", open ? '▲' : '▼'), open && /*#__PURE__*/React.createElement("div", {
+    className: "tag-picker-grid"
+  }, options.map(opt => {
+    const name = colorMode ? opt.name : opt;
+    const isSel = selected.includes(name);
+    return /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      key: name,
+      className: `tag-swatch ${isSel ? 'active' : ''}`,
+      onClick: () => toggleOption(opt)
+    }, colorMode && /*#__PURE__*/React.createElement("span", {
+      className: "swatch-dot",
+      style: {
+        background: opt.hex
+      }
+    }), name);
+  })), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: manualText,
+    onChange: e => setManualText(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addManual();
+      }
+    },
+    placeholder: placeholder || 'Add your own',
+    style: {
+      flex: 1,
+      background: 'rgba(42,39,36,0.03)',
+      border: '1px solid var(--line)',
+      color: 'var(--ivory)',
+      padding: '10px 12px',
+      fontSize: 13
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-outline",
+    style: {
+      fontSize: 11,
+      padding: '10px 14px'
+    },
+    onClick: addManual
+  }, "Add")), selected.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "tag-chip-row"
+  }, selected.map(v => /*#__PURE__*/React.createElement("span", {
+    className: "tag-chip",
+    key: v
+  }, colorMode && swatchFor(v) && /*#__PURE__*/React.createElement("span", {
+    className: "swatch-dot",
+    style: {
+      background: swatchFor(v)
+    }
+  }), v, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => removeTag(v)
+  }, "✕")))));
+}
 function emptyProduct(categories) {
   return {
     id: '',
@@ -3359,6 +3617,7 @@ function emptyProduct(categories) {
     fabric: '',
     subcategory: '',
     sizes: [],
+    colors: [],
     stock: '',
     images: [],
     featured: false,
@@ -3377,8 +3636,7 @@ function ProductForm({
   onSave,
   onCancel
 }) {
-  const [form, setForm] = useState(initial ? { ...emptyProduct(categories), ...initial, sizes: Array.isArray(initial.sizes) ? initial.sizes : [], homepageSections: Array.isArray(initial.homepageSections) ? initial.homepageSections : [] } : emptyProduct(categories));
-  const [sizesText, setSizesText] = useState(Array.isArray(form.sizes) ? form.sizes.join(', ') : '');
+  const [form, setForm] = useState(initial ? { ...emptyProduct(categories), ...initial, sizes: Array.isArray(initial.sizes) ? initial.sizes : [], colors: Array.isArray(initial.colors) ? initial.colors : [], homepageSections: Array.isArray(initial.homepageSections) ? initial.homepageSections : [] } : emptyProduct(categories));
   const availableSubs = (categorySubcategories && categorySubcategories[form.category]) || [];
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
@@ -3409,7 +3667,6 @@ function ProductForm({
       return;
     }
     const finalImages = form.images.length ? form.images : [placeholderImg(form.name || 'product')];
-    const finalSizes = sizesText.split(',').map(s => s.trim()).filter(Boolean);
     onSave({
       ...form,
       id: form.id || 'p_' + Date.now(),
@@ -3417,7 +3674,8 @@ function ProductForm({
       originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
       stock: form.stock !== '' && form.stock != null ? Number(form.stock) : 0,
       images: finalImages,
-      sizes: finalSizes
+      sizes: Array.isArray(form.sizes) ? form.sizes : [],
+      colors: Array.isArray(form.colors) ? form.colors : []
     });
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -3499,13 +3757,17 @@ function ProductForm({
     value: form.subcategory || '',
     onChange: e => setForm(f => ({ ...f, subcategory: e.target.value })),
     placeholder: "This category has no subcategories yet — add some in Manage Categories below"
+  })), /*#__PURE__*/React.createElement(TagPicker, {
+    label: "Available Sizes (optional)",
+    options: SIZE_OPTIONS,
+    colorMode: false,
+    value: form.sizes,
+    onChange: sizes => setForm(f => ({
+      ...f,
+      sizes
+    })),
+    placeholder: "e.g. 38 or a custom size"
   })), /*#__PURE__*/React.createElement("div", {
-    className: "field"
-  }, /*#__PURE__*/React.createElement("label", null, "Available Sizes (optional, comma separated)"), /*#__PURE__*/React.createElement("input", {
-    value: sizesText,
-    onChange: e => setSizesText(e.target.value),
-    placeholder: "e.g. Small, Medium, Large, X-Large"
-  }))), /*#__PURE__*/React.createElement("div", {
     className: "field-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "field"
@@ -3518,7 +3780,17 @@ function ProductForm({
       stock: e.target.value
     })),
     placeholder: "e.g. 25"
-  })), /*#__PURE__*/React.createElement("div", null)), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement(TagPicker, {
+    label: "Available Colors (optional)",
+    options: COLOR_OPTIONS,
+    colorMode: true,
+    value: form.colors,
+    onChange: colors => setForm(f => ({
+      ...f,
+      colors
+    })),
+    placeholder: "e.g. Sea Green or a custom color"
+  })), /*#__PURE__*/React.createElement("div", {
     className: "field"
   }, /*#__PURE__*/React.createElement("label", null, "Description"), /*#__PURE__*/React.createElement("textarea", {
     value: form.desc,
@@ -4122,7 +4394,7 @@ function AdminOrders({
     style: {
       maxWidth: 180
     }
-  }, o.address, ", ", o.city), /*#__PURE__*/React.createElement("td", null, (o.items || []).map(it => `${it.name}${it.size ? ' (' + it.size + ')' : ''} ×${it.qty}`).join(', ')), /*#__PURE__*/React.createElement("td", null, "Rs. ", Number(o.total).toLocaleString()), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("select", {
+  }, o.address, ", ", o.city), /*#__PURE__*/React.createElement("td", null, (o.items || []).map(it => `${it.name}${it.size ? ' (' + it.size + ')' : ''}${it.color ? ' [' + it.color + ']' : ''} ×${it.qty}`).join(', ')), /*#__PURE__*/React.createElement("td", null, "Rs. ", Number(o.total).toLocaleString()), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("select", {
     value: o.status,
     onChange: e => handleStatusChange(o.id, e.target.value),
     style: {
@@ -5260,10 +5532,10 @@ function App() {
     fireToast('Logged out');
     go('home');
   };
-  const addToCart = async (product, qty = 1, size = '') => {
+  const addToCart = async (product, qty = 1, size = '', color = '') => {
     const uid = session ? session.user.id : null;
     setCart(prev => {
-      const existing = prev.find(x => x.id === product.id && (x.size || '') === (size || ''));
+      const existing = prev.find(x => x.id === product.id && (x.size || '') === (size || '') && (x.color || '') === (color || ''));
       let updated;
       if (existing) {
         updated = prev.map(x => x === existing ? {
@@ -5274,7 +5546,8 @@ function App() {
         updated = [...prev, {
           id: product.id,
           qty,
-          size: size || ''
+          size: size || '',
+          color: color || ''
         }];
       }
       saveCart(updated, uid);
@@ -5283,11 +5556,11 @@ function App() {
     fireToast(`Added "${product.name}" to bag`);
     setCartOpen(true);
   };
-  const quickAdd = product => addToCart(product, 1, '');
-  const buyNow = (product, qty = 1, size = '') => {
+  const quickAdd = product => addToCart(product, 1, '', '');
+  const buyNow = (product, qty = 1, size = '', color = '') => {
     const uid = session ? session.user.id : null;
     setCart(prev => {
-      const existing = prev.find(x => x.id === product.id && (x.size || '') === (size || ''));
+      const existing = prev.find(x => x.id === product.id && (x.size || '') === (size || '') && (x.color || '') === (color || ''));
       let updated;
       if (existing) {
         updated = prev.map(x => x === existing ? {
@@ -5298,7 +5571,8 @@ function App() {
         updated = [...prev, {
           id: product.id,
           qty,
-          size: size || ''
+          size: size || '',
+          color: color || ''
         }];
       }
       saveCart(updated, uid);
@@ -5306,10 +5580,10 @@ function App() {
     });
     go('checkout');
   };
-  const updateQty = async (id, size, qty) => {
+  const updateQty = async (id, size, color, qty) => {
     const uid = session ? session.user.id : null;
     setCart(prev => {
-      const updated = prev.map(x => x.id === id && (x.size || '') === (size || '') ? {
+      const updated = prev.map(x => x.id === id && (x.size || '') === (size || '') && (x.color || '') === (color || '') ? {
         ...x,
         qty
       } : x);
@@ -5317,10 +5591,10 @@ function App() {
       return updated;
     });
   };
-  const removeItem = async (id, size) => {
+  const removeItem = async (id, size, color) => {
     const uid = session ? session.user.id : null;
     setCart(prev => {
-      const updated = prev.filter(x => !(x.id === id && (x.size || '') === (size || '')));
+      const updated = prev.filter(x => !(x.id === id && (x.size || '') === (size || '') && (x.color || '') === (color || '')));
       saveCart(updated, uid);
       return updated;
     });
