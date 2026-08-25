@@ -3512,6 +3512,7 @@ const COLOR_OPTIONS = [{
   hex: 'linear-gradient(90deg,#e0335e,#f2843b,#e8d23c,#3fb673,#3b8fd6,#8a5cd6)'
 }];
 const SIZE_OPTIONS = ['Free Size', 'XS', 'Small', 'Medium', 'Large', 'X-Large', 'XX-Large', 'XXX-Large'];
+const SHOE_SIZE_OPTIONS = ['30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'];
 
 /* Reusable tap-to-choose picker used for both Colors and Sizes on the admin product form.
    options: array of strings (sizes) OR array of {name, hex} (colors, when colorMode is true).
@@ -3761,14 +3762,14 @@ function ProductForm({
     placeholder: "This category has no subcategories yet — add some in Manage Categories below"
   })), /*#__PURE__*/React.createElement(TagPicker, {
     label: "Available Sizes (optional)",
-    options: SIZE_OPTIONS,
+    options: /shoe/i.test(form.category || '') ? SHOE_SIZE_OPTIONS : SIZE_OPTIONS,
     colorMode: false,
     value: form.sizes,
     onChange: sizes => setForm(f => ({
       ...f,
       sizes
     })),
-    placeholder: "e.g. 38 or a custom size"
+    placeholder: /shoe/i.test(form.category || '') ? "e.g. 41 or a custom size" : "e.g. 38 or a custom size"
   })), /*#__PURE__*/React.createElement("div", {
     className: "field-row"
   }, /*#__PURE__*/React.createElement("div", {
