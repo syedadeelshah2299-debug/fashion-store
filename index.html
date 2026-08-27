@@ -13,7 +13,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -583,7 +582,7 @@
     aspect-ratio:1/1; border-radius:7px; overflow:hidden; background:var(--sand);
     display:flex; align-items:center; justify-content:center;
   }
-  .subcat-media img{ width:100%; height:100%; object-fit:cover; transition:transform .5s ease; }
+  .subcat-media img{ width:100%; height:100%; object-fit:contain; transition:transform .5s ease; }
   .subcat-card:hover .subcat-media img{ transform:scale(1.06); }
   .subcat-label{ margin-top:12px; font-family:'Playfair Display', serif; font-size:14.5px; font-weight:600; letter-spacing:0.01em; color:var(--ivory); }
   @media (max-width:560px){
@@ -4445,148 +4444,6 @@ function countBase64Images(products, categoryImages) {
   });
   return count;
 }
-/* ---------------- Bulk Product Upload (CSV) ---------------- */
-/* Expected CSV columns (header row required):
-   name, category, subcategory, price, original_price, description, fabric, stock, sizes, colors, featured
-   - sizes and colors: separate multiple values with a comma inside the cell, e.g. "Small, Medium, Large"
-   - featured: TRUE or FALSE (optional, defaults to FALSE)
-   - Images are NOT included in CSV — add them afterward by editing each product in the admin panel. */
-function parseListCell(val) {
-  if (!val) return [];
-  return String(val).split(',').map(s => s.trim()).filter(Boolean);
-}
-function BulkUploadPanel({
-  categories,
-  setProducts,
-  fireToast
-}) {
-  const [uploading, setUploading] = useState(false);
-  const [summary, setSummary] = useState(null);
-  const fileRef = useRef(null);
-  const handleFile = file => {
-    if (!window.Papa) {
-      fireToast('CSV parser failed to load — refresh and try again');
-      return;
-    }
-    setUploading(true);
-    setSummary(null);
-    window.Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async results => {
-        const rows = results.data || [];
-        let added = 0;
-        let skipped = 0;
-        const skippedNames = [];
-        const newlyAdded = [];
-        for (const row of rows) {
-          const name = (row.name || '').trim();
-          const category = (row.category || '').trim();
-          const price = Number(row.price);
-          if (!name || !category || !price) {
-            skipped++;
-            skippedNames.push(name || '(unnamed row)');
-            continue;
-          }
-          const product = {
-            id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2),
-            name,
-            category,
-            subcategory: (row.subcategory || '').trim(),
-            price,
-            originalPrice: row.original_price ? Number(row.original_price) : null,
-            desc: (row.description || '').trim(),
-            fabric: (row.fabric || '').trim(),
-            stock: row.stock ? Number(row.stock) : 0,
-            sizes: parseListCell(row.sizes),
-            colors: parseListCell(row.colors),
-            featured: String(row.featured || '').trim().toLowerCase() === 'true',
-            homepageSections: [],
-            images: [placeholderImg(name)]
-          };
-          try {
-            const saved = await insertProduct(product);
-            if (saved) {
-              newlyAdded.push(saved);
-              added++;
-            } else {
-              skipped++;
-              skippedNames.push(name);
-            }
-          } catch (e) {
-            console.error('Bulk upload row failed:', name, e);
-            skipped++;
-            skippedNames.push(name);
-          }
-        }
-        if (newlyAdded.length) {
-          setProducts(prev => [...newlyAdded, ...prev]);
-        }
-        setSummary({
-          added,
-          skipped,
-          skippedNames
-        });
-        setUploading(false);
-        fireToast(`Bulk upload complete — ${added} added`);
-      },
-      error: err => {
-        console.error('CSV parse error:', err);
-        fireToast('Could not read that file — make sure it is a valid CSV');
-        setUploading(false);
-      }
-    });
-  };
-  return /*#__PURE__*/React.createElement("div", {
-    className: "admin-panel-box"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "serif"
-  }, "Bulk Upload Products (CSV)"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 13,
-      color: 'var(--sand-dim)',
-      marginBottom: 16,
-      maxWidth: 600
-    }
-  }, "Add many products at once from a spreadsheet. Required columns: ", /*#__PURE__*/React.createElement("code", null, "name, category, price"), ". Optional: ", /*#__PURE__*/React.createElement("code", null, "subcategory, original_price, description, fabric, stock, sizes, colors, featured"), ". For ", /*#__PURE__*/React.createElement("code", null, "sizes"), " and ", /*#__PURE__*/React.createElement("code", null, "colors"), ", separate multiple values with a comma inside the cell. Images aren't included — add those afterward by editing each product."), /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-outline",
-    disabled: uploading,
-    onClick: () => fileRef.current.click(),
-    style: {
-      marginBottom: 14
-    }
-  }, uploading ? 'Uploading…' : 'Choose CSV File'), /*#__PURE__*/React.createElement("input", {
-    ref: fileRef,
-    type: "file",
-    accept: ".csv",
-    style: {
-      display: 'none'
-    },
-    onChange: e => {
-      const file = e.target.files[0];
-      if (file) handleFile(file);
-      e.target.value = '';
-    }
-  }), summary && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: 'var(--sand-dim)',
-      marginTop: 8
-    }
-  }, /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", {
-    style: {
-      color: 'var(--brass)'
-    }
-  }, summary.added), " product(s) added successfully."), summary.skipped > 0 && /*#__PURE__*/React.createElement("p", {
-    style: {
-      marginTop: 6
-    }
-  }, /*#__PURE__*/React.createElement("strong", {
-    style: {
-      color: '#e07a7a'
-    }
-  }, summary.skipped), " row(s) skipped (missing name, category, or price): ", summary.skippedNames.join(', '))));
-}
 function ImageMigrationPanel({
   products,
   setProducts,
@@ -5211,11 +5068,7 @@ function AdminDashboard({
     style: {
       marginBottom: 30
     }
-  }, "+ Add New Product"), /*#__PURE__*/React.createElement(BulkUploadPanel, {
-    categories: categories,
-    setProducts: setProducts,
-    fireToast: fireToast
-  }), /*#__PURE__*/React.createElement("div", {
+  }, "+ Add New Product"), /*#__PURE__*/React.createElement("div", {
     className: "admin-panel-box"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
