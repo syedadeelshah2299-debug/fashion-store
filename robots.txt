@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://fashion-store-ten-rust.vercel.app/sitemap.xml
